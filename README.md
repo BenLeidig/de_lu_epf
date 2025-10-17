@@ -2,12 +2,19 @@
 
 ## Repository Structure
 ures_epf/
+
 ├── data/
+
 ├── doc/
+
 ├── models/
+
 ├── results/
+
 ├── src/
+
 ├── LICENSE
+
 └── README.md
 
 ### data/
