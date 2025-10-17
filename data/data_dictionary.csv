@@ -1,0 +1,39 @@
+,dtype,units,description
+datetime,"datetime64[ns, UTC]",YYYY-MM-DDThh:mm:ss,ISO 8601-formatted timestamp of this record in UTC.
+precipitation,float64,mm,Total precipitation during the following hour.
+cloud_cover,float64,%,Total cloud cover an hour after the timestamp.
+sunshine,float64,min,Sunshine duration during the following hour.
+temperature,float64,ºC,"Air temperature an hour after the timestamp, 2 m above the ground."
+relative_humidity,float64,%,Relative humidity an hour after the timestamp.
+price,float64,EUR/MWh,The day-ahead spot market price for the DE-LU bidding zone. Takes the last 15-minute interval value and assigns to the start of the hour interval.
+hydro_run_of_river,float64,MW,Electricity generation from hydro run-of-river recorded at the end of the following hour.
+biomass,float64,MW,Electricity generation from biomass recorded at the end of the following hour.
+fossil_brown_coal_/_lignite,float64,MW,Electricity generation from fossil brown coal / lignite recorded at the end of the following hour.
+fossil_hard_coal,float64,MW,Electricity generation from fossil hard coal recorded at the end of the following hour.
+fossil_oil,float64,MW,Electricity generation from fossil oil recorded at the end of the following hour.
+fossil_coal_derived_gas,float64,MW,Electricity generation from fossil coal-derived gas recorded at the end of the following hour.
+fossil_gas,float64,MW,Electricity generation from fossil gas recorded at the end of the following hour.
+geothermal,float64,MW,Electricity generation from geothermal recorded at the end of the following hour.
+hydro_water_reservoir,float64,MW,Electricity generation from hydro water reservoir recorded at the end of the following hour.
+hydro_pumped_storage,float64,MW,Electricity generation from pumped storage recorded at the end of the following hour.
+others,float64,MW,Electricity generation from other sources recorded at the end of the following hour.
+waste,float64,MW,Electricity generation from waste recorded at the end of the following hour.
+wind_offshore,float64,MW,Electricity generation from wind offshore recorded at the end of the following hour.
+wind_onshore,float64,MW,Electricity generation from wind onshore recorded at the end of the following hour.
+solar,float64,MW,Electricity generation from solar recorded at the end of the following hour.
+load,float64,MW,Instantaneous grid load recorded at the end of the following hour.
+residual_load,float64,MW,Instantaneous grid load not covered by renewable generation sources recorded at the end of the following hour.
+renewable_share_of_load,float64,MW,Instantaneous grid load covered by renewable generation sources recorded at the end of the following hour.
+renewable_share_of_generation,float64,MW,Total electricity generation from renewable generation sources recorded at the end of the following hour.
+austria_cbet,float64,GW,"The cross-border electricity trading with Austria recorded at the end of the following hour. Positive values indicate an import of electricity, whereas negative values show electricity exports."
+belgium_cbet,float64,GW,"The cross-border electricity trading with Belgium recorded at the end of the following hour. Positive values indicate an import of electricity, whereas negative values show electricity exports."
+czech_republic_cbet,float64,GW,"The cross-border electricity trading with Czech Republic recorded at the end of the following hour. Positive values indicate an import of electricity, whereas negative values show electricity exports."
+denmark_cbet,float64,GW,"The cross-border electricity trading with Denmark recorded at the end of the following hour. Positive values indicate an import of electricity, whereas negative values show electricity exports."
+france_cbet,float64,GW,"The cross-border electricity trading with France recorded at the end of the following hour. Positive values indicate an import of electricity, whereas negative values show electricity exports."
+luxembourg_cbet,float64,GW,"The cross-border electricity trading with Luxembourg recorded at the end of the following hour. Positive values indicate an import of electricity, whereas negative values show electricity exports."
+netherlands_cbet,float64,GW,"The cross-border electricity trading with Netherlands recorded at the end of the following hour. Positive values indicate an import of electricity, whereas negative values show electricity exports."
+norway_cbet,float64,GW,"The cross-border electricity trading with Norway recorded at the end of the following hour. Positive values indicate an import of electricity, whereas negative values show electricity exports."
+poland_cbet,float64,GW,"The cross-border electricity trading with Poland recorded at the end of the following hour. Positive values indicate an import of electricity, whereas negative values show electricity exports."
+sweden_cbet,float64,GW,"The cross-border electricity trading with Sweden recorded at the end of the following hour. Positive values indicate an import of electricity, whereas negative values show electricity exports."
+switzerland_cbet,float64,GW,"The cross-border electricity trading with Switzerland recorded at the end of the following hour. Positive values indicate an import of electricity, whereas negative values show electricity exports."
+sum_cbet,float64,GW,"The cross-border electricity trading with all other countries recorded at the end of the following hour. Positive values indicate an import of electricity, whereas negative values show electricity exports."
