@@ -1,3 +1,4 @@
 .DS_Store
 doc/svr_cache
 models/svr_opt_searches
+models/gru_opt_searches
