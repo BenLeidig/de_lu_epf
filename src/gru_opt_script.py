@@ -67,7 +67,7 @@ def objective(trial):
     slurm_node = os.environ.get('SLURMD_NODENAME', 'unknown')
     print(f"Trial on node {slurm_node}, process {slurm_procid}")
 
-    hidden_size = trial.suggest_int('hidden_size', 32, 256, step=16)
+    hidden_size = trial.suggest_int('hidden_size', 32, 128, step=16)
     lr = trial.suggest_categorical('lr', [1e-4, 1e-3, 1e-2])
     dropout = trial.suggest_float('dropout', 0.0, 0.5, step=0.05)
     batch_size = trial.suggest_categorical('batch_size', [32, 64, 128, 256])
@@ -105,6 +105,8 @@ def objective(trial):
 
         train_dataset = TensorDataset(X_train_norm, y_train_norm)
         train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
+        val_dataset = TensorDataset(X_val_norm, y_val_norm)
+        val_loader = DataLoader(val_dataset, batch_size=len(val_dataset)//10, shuffle=False)
 
         best_val_loss = np.inf
         patience_counter = 0
@@ -112,18 +114,21 @@ def objective(trial):
 
         for epoch in range(100):
             mod.train()
-            for xb, yb in train_loader:
-                # xb, yb = xb.to(device, non_blocking=True), yb.to(device, non_blocking=True)
+            for xb_train_norm, yb_train_norm in train_loader:
                 optimizer.zero_grad()
-                preds = mod(xb)
-                loss = criterion(preds, yb)
+                yb_train_norm_pred = mod(xb_train_norm)
+                loss = criterion(yb_train_norm_pred, yb_train_norm)
                 loss.backward()
                 optimizer.step()
             
             mod.eval()
             with torch.no_grad():
-                y_val_norm_pred = mod(X_val_norm)
-                val_loss = criterion(y_val_norm_pred, y_val_norm).item()
+                val_loss = []
+                for xb_val_norm, yb_val_norm in val_loader:
+                    yb_val_norm_pred = mod(xb_val_norm)
+                    batch_loss = criterion(yb_val_norm_pred, yb_val_norm).item()
+                    val_loss.append(batch_loss)
+                val_loss = np.mean(val_loss)
 
             trial.report(val_loss, step=step)
             step += 1
@@ -143,12 +148,16 @@ def objective(trial):
             mod.load_state_dict(best_state)
         mod.eval()
         with torch.no_grad():
-            y_val_norm_pred = mod(X_val_norm)
-            y_val_pred = mod.target_denorm(y_val_norm_pred)
-            fold_scores.append(((y_val_pred - y_val) ** 2).mean().item())
+            curr_score = []
+            for xb_val_norm, yb_val_norm in val_loader:
+                yb_val_norm_pred = mod(xb_val_norm)
+                yb_val_pred = mod.target_denorm(yb_val_norm_pred)
+                yb_val = mod.target_denorm(yb_val_norm)
+                curr_score.append(((yb_val_pred - yb_val) ** 2).mean().item())
+            fold_scores.append(np.mean(curr_score))
 
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
     return np.mean(fold_scores)
 
