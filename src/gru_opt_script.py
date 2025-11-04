@@ -67,11 +67,11 @@ def objective(trial):
     slurm_node = os.environ.get('SLURMD_NODENAME', 'unknown')
     print(f"Trial on node {slurm_node}, process {slurm_procid}")
 
-    hidden_size = trial.suggest_int('hidden_size', 32, 128, step=16)
-    lr = trial.suggest_categorical('lr', [1e-4, 1e-3, 1e-2])
-    dropout = trial.suggest_float('dropout', 0.0, 0.5, step=0.05)
+    hidden_size = trial.suggest_int('hidden_size', 32, 256, log=True)
+    lr = trial.suggest_float('lr', 1e-5, 1e-2, log=True)
+    dropout = trial.suggest_float('dropout', 0.0, 0.7)
     batch_size = trial.suggest_categorical('batch_size', [32, 64, 128, 256])
-    num_layers = trial.suggest_categorical('num_layers', [2, 3, 4])
+    num_layers = trial.suggest_int('num_layers', 1, 4)
 
     fold_scores, patience, step = [], 10, 0
     for (train_idx, val_idx) in tscv.split(X_train_val):
@@ -137,12 +137,7 @@ def objective(trial):
             
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
-                patience_counter = 0
                 best_state = mod.state_dict().copy()
-            else:
-                patience_counter += 1
-                if patience_counter >= patience:
-                    break
 
         if best_state:
             mod.load_state_dict(best_state)
