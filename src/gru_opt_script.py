@@ -73,7 +73,7 @@ def objective(trial):
     batch_size = trial.suggest_categorical('batch_size', [32, 64, 128, 256])
     num_layers = trial.suggest_int('num_layers', 1, 4)
 
-    fold_scores, patience, step = [], 10, 0
+    fold_scores, step = [], 0
     for (train_idx, val_idx) in tscv.split(X_train_val):
         X_train, X_val = X_train_val.iloc[train_idx].to_numpy(), X_train_val.iloc[val_idx].to_numpy()
         y_train, y_val = y_train_val.iloc[train_idx].to_numpy(), y_train_val.iloc[val_idx].to_numpy()
@@ -109,7 +109,6 @@ def objective(trial):
         val_loader = DataLoader(val_dataset, batch_size=len(val_dataset)//10, shuffle=False)
 
         best_val_loss = np.inf
-        patience_counter = 0
         best_state = None
 
         for epoch in range(100):
@@ -131,13 +130,14 @@ def objective(trial):
                 val_loss = np.mean(val_loss)
 
             trial.report(val_loss, step=step)
-            step += 1
             if trial.should_prune():
                 raise optuna.TrialPruned()
             
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
                 best_state = mod.state_dict().copy()
+
+            step += 1
 
         if best_state:
             mod.load_state_dict(best_state)
@@ -159,11 +159,28 @@ def objective(trial):
     
 study = optuna.create_study(
     direction='minimize',
-    sampler=optuna.samplers.TPESampler(),
-    pruner=optuna.pruners.HyperbandPruner(),
+    sampler=optuna.samplers.TPESampler(multivariate=True, seed=1),
+    pruner=optuna.pruners.HyperbandPruner(min_resource=100, max_resource=300),
     study_name='gru_opt_tpe_hyperband_gpu'
 )
 study.optimize(objective, n_trials=250, timeout=60*60*48-60)
 best_trial = study.best_trial
 joblib.dump(study, os.path.join(SCRATCH_PATH, 'gru_tpe_hyperband_gpu.pkl'))
 joblib.dump(best_trial, os.path.join(SCRATCH_PATH, 'gru.pkl'))
+
+
+# #!/bin/bash
+# #SBATCH --job-name=gru_optuna
+# #SBATCH --output=/scratch/%u/gru_optuna_%j.out
+# #SBATCH --error=/scratch/%u/gru_optuna_%j.err
+# #SBATCH --account=stat
+# #SBATCH --partition=stat
+# #SBATCH --time=48:00:00
+# #SBATCH --nodes=1
+# #SBATCH --ntasks-per-node=1
+# #SBATCH --cpus-per-task=1
+# #SBATCH --mem=32G
+# #SBATCH --gres=gpu:1
+
+# source /u/bleidig2/venvs/epfvenv/bin/activate
+# srun python /u/bleidig2/gru_opt_script.py
