@@ -63,24 +63,24 @@ def absolute_percentage_bias(y_true, y_pred):
     apb = np.abs(np.sum(y_true-y_pred) / np.sum(y_true))
     return apb
 
-def evaluate_model(model, X, y_true) -> pd.DataFrame:
+def cumscore(y_true, y_pred, metric):
+    cumscores = []
+    for i in range(1, len(y_true)+1):
+        score = metric(y_true=y_true[:i], y_pred=y_pred[:i])
+        cumscores.append(score)
+    return cumscores
+
+def evaluate_model(y_true, y_pred) -> pd.DataFrame:
 
     '''
     model   :   A pre-trained model object.
     X       :   Feature matrix. Should be in the format your model object requires.
     y_true  :   True target array for prediction evaluation.
     '''
-
-    if hasattr(model, 'predict'):
-        y_pred = model.predict(X)
-    elif callable(model):
-        y_pred = model(X)
-    else:
-        raise TypeError('Model must be callable or have a .predict() method.')
     
     abbr = [
         'r2', 'wi', 'ns', 'lm', 'kge',
-        'rmse', 'mae', 'nrmse', 'rmae', 'smape', 'tic', 'apb'
+        'rmse', 'mae', 'nrmse', 'rmape', 'smape', 'tic', 'apb'
     ]
     prop = ['variance']*5 + ['bias']*7
     metrics = [
