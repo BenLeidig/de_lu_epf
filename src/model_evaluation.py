@@ -52,7 +52,7 @@ def theils_inequality_coefficient(y_true, y_pred):
     y_true = np.asarray(y_true)
     y_pred = np.asarray(y_pred)
     n = len(y_true)
-    numerator = np.sqrt((1/n) * (np.sum(y_pred-y_true)**2))
+    numerator = np.sqrt((1/n) * (np.sum((y_pred-y_true)**2)))
     denominator = np.sqrt((1/n) * np.sum(y_true**2)) + np.sqrt((1/n) * np.sum(y_pred**2))
     tic = numerator / denominator
     return tic

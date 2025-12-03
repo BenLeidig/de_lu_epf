@@ -27,7 +27,6 @@ class CNN1_LSTMnn(nn.Module):
 
         self.register_buffer('x_min', torch.zeros(1, 1, input_size))
         self.register_buffer('x_max', torch.ones(1, 1, input_size))
-
         self.register_buffer('y_min', torch.zeros(1, 1, output_size))
         self.register_buffer('y_max', torch.ones(1, 1, output_size))
 
@@ -38,11 +37,10 @@ class CNN1_LSTMnn(nn.Module):
         self.fc = nn.Linear(hidden_size, output_size*24)
 
     def init_norm(self, X_train, y_train):
-        self.x_min = X_train.amin(dim=(0, 1), keepdim=True)
-        self.x_max = X_train.amax(dim=(0, 1), keepdim=True)
-
-        self.y_min = y_train.amin(dim=0, keepdim=True)
-        self.y_max = y_train.amax(dim=0, keepdim=True)
+        self.x_min.copy_(X_train.amin(dim=(0, 1), keepdim=True))
+        self.x_max.copy_(X_train.amax(dim=(0, 1), keepdim=True))
+        self.y_min.copy_(y_train.amin(dim=(0, 1), keepdim=True))
+        self.y_max.copy_(y_train.amax(dim=(0, 1), keepdim=True))
 
     def target_denorm(self, y_pred):
         return y_pred * (self.y_max - self.y_min) + self.y_min
