@@ -97,3 +97,64 @@ def evaluate_model(y_true, y_pred) -> pd.DataFrame:
     )
 
     return df
+
+def cum_rmse(y_true, y_pred):
+    y_true = np.asarray(y_true).ravel()
+    y_pred = np.asarray(y_pred).ravel()
+    cum_sum_sq = np.cumsum((y_true - y_pred)**2)
+    counts = np.arange(1, len(y_true)+1)
+    return np.sqrt(cum_sum_sq / counts)
+
+def cum_mae(y_true, y_pred):
+    y_true = np.asarray(y_true).ravel()
+    y_pred = np.asarray(y_pred).ravel()
+    cum_sum_abs = np.cumsum(np.abs(y_true - y_pred))
+    counts = np.arange(1, len(y_true)+1)
+    return cum_sum_abs / counts
+
+def cum_nrmse(y_true, y_pred):
+    y_true = np.asarray(y_true).ravel()
+    rmse = cum_rmse(y_true, y_pred)
+    global_mean = np.mean(y_true)
+    if global_mean == 0:
+        return np.full_like(rmse, np.nan, dtype=float)
+    return rmse / global_mean
+
+def cum_rmae(y_true, y_pred):
+    y_true = np.asarray(y_true).ravel()
+    mae = cum_mae(y_true, y_pred)
+    global_mean = np.mean(y_true)
+    if global_mean == 0:
+        return np.full_like(mae, np.nan, dtype=float)
+    return mae / global_mean
+
+def cum_smape(y_true, y_pred):
+    y_true = np.asarray(y_true).ravel()
+    y_pred = np.asarray(y_pred).ravel()
+    abs_diff = np.abs(y_true - y_pred)
+    denom = (np.abs(y_true) + np.abs(y_pred)) / 2
+    ratio = np.divide(abs_diff, denom, out=np.zeros_like(abs_diff, dtype=float), where=denom != 0)
+    cum_sum = np.cumsum(ratio)
+    counts = np.arange(1, len(y_true)+1)
+    return cum_sum / counts
+
+def cum_apb(y_true, y_pred):
+    y_true = np.asarray(y_true).ravel()
+    y_pred = np.asarray(y_pred).ravel()
+    global_sum = np.sum(y_true)
+    cum_num = np.cumsum(y_true - y_pred)
+    if global_sum == 0:
+        return np.full_like(cum_num, np.nan, dtype=float)
+    return np.abs(cum_num / global_sum)
+
+def cum_tic(y_true, y_pred):
+    y_true = np.asarray(y_true).ravel()
+    y_pred = np.asarray(y_pred).ravel()
+    n_total = len(y_true)
+    numerator = np.sqrt(np.cumsum((y_pred - y_true)**2) / np.arange(1, n_total+1))
+    global_den1 = np.sqrt(np.sum(y_true**2) / n_total)
+    global_den2 = np.sqrt(np.sum(y_pred**2) / n_total)
+    denominator = global_den1 + global_den2
+    if denominator == 0:
+        return np.full_like(numerator, np.nan, dtype=float)
+    return numerator / denominator
