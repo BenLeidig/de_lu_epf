@@ -19,19 +19,22 @@ def create_sequences(X, y, seq_len, pred_len, stride):
     return np.array(Xs), np.array(ys)
 
 
-def create_nn_objective(model_class, cv, scaler_class, X_train_val:np.array, y_train_val:np.array, search_space:dict):
+def create_nn_objective(model_class, search_space:dict, scaler_class, X_train:np.array, y_train:np.array, X_val:np.array, y_val:np.array):
     '''
     Docstring for create_nn_objective
     
     :param model_class: ANN class.
-    :param search_space: Should be in format {hidden_size:{method:suggest_int, ...}, ..., lr:0.01, batch_size:16} except when `sampler`='deterministic'.
+    :param search_space: Should be in format {hidden_size:{method:suggest_int, ...}, ..., lr:0.01, batch_size:16} except when the sampler is deterministic.
     :type search_space: dict
-    :param cv: Instantiated CV object.
     :param scaler_class: Scaler class.
-    :param X_train_val: Feature matrix of train and validation set values.
-    :type X_train_val: np.array
-    :param y_train_val: Target array of train and validation set values.
-    :type y_train_val: np.array
+    :param X_train: Feature matrix of train set values.
+    :type X_train: np.array
+    :param y_train: Target array of train and validation set values.
+    :type y_train: np.array
+    :param X_val: Feature matrix of validation set values.
+    :type X_val: np.array
+    :param y_val: Target array of validation set values.
+    :type y_val: np.array
     '''
     def objective(trial):
         device = torch.device('mps' if torch.backends.mps.is_available() else 'cpu')
@@ -45,71 +48,61 @@ def create_nn_objective(model_class, cv, scaler_class, X_train_val:np.array, y_t
             else:
                 params[name] = spec
         
-        input_size = X_train_val.shape[1]
-        fold_scores, step = [], 0
-        for (train_idx, val_idx) in cv.split(X_train_val):
-            X_train, X_val = X_train_val[train_idx], X_train_val[val_idx]
-            y_train, y_val = y_train_val[train_idx], y_train_val[val_idx]
+        input_size = X_train.shape[1]
 
-            feature_scaler = scaler_class()
-            X_train_scaled = feature_scaler.fit_transform(X_train)
-            X_val_scaled = feature_scaler.transform(X_val)
+        feature_scaler = scaler_class()
+        X_train_scaled = feature_scaler.fit_transform(X_train)
+        X_val_scaled = feature_scaler.transform(X_val)
 
-            target_scaler = scaler_class()
-            y_train_scaled = target_scaler.fit_transform(y_train)
-            y_val_scaled = target_scaler.transform(y_val)
+        target_scaler = scaler_class()
+        y_train_scaled = target_scaler.fit_transform(y_train)
+        y_val_scaled = target_scaler.transform(y_val)
 
-            X_train_scaled, y_train_scaled = create_sequences(X_train_scaled, y_train_scaled, seq_len=24*7, pred_len=24)
-            X_val_scaled, y_val_scaled = create_sequences(X_val_scaled, y_val_scaled, seq_len=24*7, pred_len=24)
+        X_train_scaled, y_train_scaled = create_sequences(X_train_scaled, y_train_scaled, seq_len=24*7, pred_len=24, stride=24)
+        X_val_scaled, y_val_scaled = create_sequences(X_val_scaled, y_val_scaled, seq_len=24*7, pred_len=24, stride=24)
 
-            X_train_scaled = torch.tensor(X_train_scaled, dtype=torch.float32).to(device)
-            y_train_scaled = torch.tensor(y_train_scaled, dtype=torch.float32).to(device)
-            X_val_scaled = torch.tensor(X_val_scaled, dtype=torch.float32).to(device)
-            y_val_scaled = torch.tensor(y_val_scaled, dtype=torch.float32).to(device)
+        X_train_scaled = torch.tensor(X_train_scaled, dtype=torch.float32).to(device)
+        y_train_scaled = torch.tensor(y_train_scaled, dtype=torch.float32).to(device)
+        X_val_scaled = torch.tensor(X_val_scaled, dtype=torch.float32).to(device)
+        y_val_scaled = torch.tensor(y_val_scaled, dtype=torch.float32).to(torch.device('cpu'))
 
-            lr, batch_size = params.pop('lr', 1e-3), params.pop('batch_size', 16)
-            mod = model_class(input_size=input_size, **params).to(device)
+        lr, batch_size = params.pop('lr', 1e-3), params.pop('batch_size', 16)
+        mod = model_class(input_size=input_size, **params).to(device)
+        
+        optimizer = torch.optim.Adam(mod.parameters(), lr=lr)
+        criterion = nn.MSELoss()
+
+        train_dataset = TensorDataset(X_train_scaled, y_train_scaled)
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
+
+        best_val_loss = np.inf
+        best_state = None
+
+        for epoch in range(100):
+            mod.train()
+            for xb_train_scaled, yb_train_scaled in train_loader:
+                optimizer.zero_grad()
+                yb_train_scaled_pred = mod(xb_train_scaled)
+                loss = criterion(yb_train_scaled_pred, yb_train_scaled)
+                loss.backward()
+                optimizer.step()
             
-            optimizer = torch.optim.Adam(mod.parameters(), lr=lr)
-            criterion = nn.MSELoss()
+            mod.eval()
+            with torch.no_grad():
+                y_val_scaled_pred = mod(X_val_scaled).cpu().detach()
+                val_loss = criterion(y_val_scaled_pred, y_val_scaled).item()
 
-            train_dataset = TensorDataset(X_train_scaled, y_train_scaled)
-            train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
+            trial.report(val_loss, step=epoch)
+            if trial.should_prune():
+                raise optuna.TrialPruned()
+            
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                best_state = {k: v.clone().to('cpu') for k, v in mod.state_dict().items()}
 
-            best_val_loss = np.inf
-            best_state = None
-
-            for epoch in range(100):
-                mod.train()
-                for xb_train_scaled, yb_train_scaled in train_loader:
-                    optimizer.zero_grad()
-                    yb_train_scaled_pred = mod(xb_train_scaled)
-                    loss = criterion(yb_train_scaled_pred, yb_train_scaled)
-                    loss.backward()
-                    optimizer.step()
-                
-                mod.eval()
-                with torch.no_grad():
-                    y_val_scaled_pred = mod(X_val_scaled)
-                    val_loss = criterion(y_val_scaled_pred, y_val_scaled).item()
-
-                trial.report(val_loss, step=step)
-                if trial.should_prune():
-                    raise optuna.TrialPruned()
-                
-                if val_loss < best_val_loss:
-                    best_val_loss = val_loss
-                    best_state = {k: v.clone().to('cpu') for k, v in mod.state_dict().items()}
-
-                step += 1
-
-            if best_state:
-                mod.load_state_dict(best_state)
-            y_val_pred = target_scaler.inverse_transform(y_val_scaled_pred.to(torch.device('cpu')).detach().numpy().flatten().reshape(-1, 1))
-            val_loss = ((y_val_pred - y_val.detach().numpy())**2).mean()
-            fold_scores.append(val_loss)
-
-        return np.mean(fold_scores)
+        trial.set_user_attr('best_state_dict', best_state)
+        
+        return best_val_loss
     
     return objective
 
@@ -174,8 +167,8 @@ def optimize_gru(X_train_val:np.array, y_train_val:np.array, path:str, batch_siz
     y_train_scaled = target_scaler.fit_transform(y_train)
     y_val_scaled = target_scaler.transform(y_val)
 
-    X_train_scaled, y_train_scaled = create_sequences(X_train_scaled, y_train_scaled, seq_len=24*7, pred_len=24)
-    X_val_scaled, y_val_scaled = create_sequences(X_val_scaled, y_val_scaled, seq_len=24*7, pred_len=24)
+    X_train_scaled, y_train_scaled = create_sequences(X_train_scaled, y_train_scaled, seq_len=24*7, pred_len=24, stride=24)
+    X_val_scaled, y_val_scaled = create_sequences(X_val_scaled, y_val_scaled, seq_len=24*7, pred_len=24, stride=24)
 
     X_train_scaled = torch.tensor(X_train_scaled, dtype=torch.float32, device=device)
     y_train_scaled = torch.tensor(y_train_scaled, dtype=torch.float32, device=device)
