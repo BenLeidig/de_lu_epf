@@ -1,10 +1,72 @@
+from joblib import dump
 import pandas as pd
-
+from sklearn.preprocessing import StandardScaler
+from sktime.transformations.series.vmd import VmdTransformer
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 import lightning.pytorch as pl
 
 torch.set_float32_matmul_precision('high')
+
+
+def save_splits(df:pd.DataFrame, time_splits:list, f_names:list, data_dir:str='../data/processed/', scaler_dir:str='../models/scalers/'):
+    for (train_start, train_end, test_start, test_end), (f_train, f_test) in zip(time_splits, f_names):
+        
+        df_train = df.loc[train_start:train_end]
+        df_test = df.loc[test_start:test_end]
+
+        ss = StandardScaler()
+        df_train_scaled = pd.DataFrame(ss.fit_transform(df_train), columns=df_train.columns)
+        df_test_scaled = pd.DataFrame(ss.transform(df_test), columns=df_test.columns)
+
+        dump(ss, scaler_dir+'ss_'+f_train+'.pkl')
+        df_train.to_pickle(data_dir+f_train+'.pkl')
+        df_test.to_pickle(data_dir+f_test+'.pkl')
+        df_train_scaled.to_pickle(data_dir+f_train+'_scaled.pkl')
+        df_test_scaled.to_pickle(data_dir+f_test+'_scaled.pkl')
+
+
+def save_imf_splits(df:pd.DataFrame, time_splits:list, f_names:list, data_dir:str='../data/processed/', scaler_dir:str='../models/scalers/', vmd_dir:str='../models/vmd/'):
+    for (train_start, train_end, test_start, test_end), (f_train, f_test) in zip(time_splits, f_names):
+        
+        # instantiation
+        vmd = VmdTransformer(K=5, alpha=4_000)
+        vmd.set_random_state(0)
+        ss = StandardScaler()
+
+        # train-test split
+        df_train = df.loc[train_start:train_end]
+        np_train_price = df_train['price'].to_numpy()
+        df_test = df.loc[test_start:test_end]
+        np_test_price = df_test['price'].to_numpy()
+
+        # VMD train
+        np_train_imf = vmd.fit_transform(np_train_price)
+        df_train_imf = pd.DataFrame(data=np_train_imf, columns=[f'imf{i}' for i in range(1, 6)])
+        df_train_imf['resid'] = np_train_price - df_train_imf.sum(axis=1)
+        df_train_imf = df_train_imf.set_index(df_train.index)
+        # scale train
+        np_train_imf_scaled = ss.fit_transform(df_train_imf)
+        df_train_imf_scaled = pd.DataFrame(data=np_train_imf_scaled, columns=df_train_imf.columns)
+        df_train_imf_scaled = df_train_imf_scaled.set_index(df_train.index)
+
+        # VMD test
+        np_test_imf = vmd.transform(np_test_price)
+        df_test_imf = pd.DataFrame(data=np_test_imf, columns=[f'imf{i}' for i in range(1, 6)])
+        df_test_imf['resid'] = np_test_price - df_test_imf.sum(axis=1)
+        df_test_imf = df_test_imf.set_index(df_test.index)
+        # scale test
+        np_test_imf_scaled = ss.transform(df_test_imf)
+        df_test_imf_scaled = pd.DataFrame(data=np_test_imf_scaled, columns=df_test_imf.columns)
+        df_test_imf_scaled = df_test_imf_scaled.set_index(df_test.index)
+
+        # exporting
+        dump(vmd, vmd_dir+'vmd_'+f_train+'.pkl')
+        dump(ss, scaler_dir+'ss_'+f_train+'.pkl')
+        df_train_imf.to_pickle(data_dir+f_train+'.pkl')
+        df_test_imf.to_pickle(data_dir+f_test+'.pkl')
+        df_train_imf_scaled.to_pickle(data_dir+f_train+'_scaled.pkl')
+        df_test_imf_scaled.to_pickle(data_dir+f_test+'_scaled.pkl')
 
 
 class EPFDataset(torch.utils.data.Dataset):
