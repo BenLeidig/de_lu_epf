@@ -12,14 +12,15 @@ def vmd_tcn_lstm_mha_hpo(
         imf:int,
         data_dir:str,
         seq_len:int=24*7*4,
-        input_size:int=8,
+        input_size:int=10,
         num_splits:int=2,
         patience:int=5,
         max_epochs:int=50,
         reduction_factor:int=3,
         tpe_kwargs:dict=None,
         study_kwargs:dict=None,
-        optimize_kwargs:dict=None
+        optimize_kwargs:dict=None,
+        accelerator:str='gpu'
     ):
 
     tpe_kwargs = tpe_kwargs or {'seed':0}
@@ -100,9 +101,9 @@ def vmd_tcn_lstm_mha_hpo(
             )
             
             trainer = pl.Trainer(
-                max_epochs=50,
+                max_epochs=max_epochs,
                 callbacks=callbacks,
-                accelerator='gpu',
+                accelerator=accelerator,
                 logger=False,
                 enable_checkpointing=False
             )

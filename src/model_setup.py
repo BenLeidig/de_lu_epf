@@ -21,7 +21,7 @@ class TCN_LSTM_MHA(pl.LightningModule):
     ):
         super().__init__()
         self.save_hyperparameters()
-        self.criterion = torch.nn.MSELoss()
+        self.criterion = torch.nn.L1Loss()
         self.lr_init = lr_init
 
         #### model ####
