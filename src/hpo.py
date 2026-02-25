@@ -14,14 +14,15 @@ def vmd_tcn_lstm_mha_hpo(
         seq_len:int=24*7*4,
         input_size:int=8,
         num_splits:int=2,
-        sampler_kwargs:dict=None,
-        pruner_kwargs:dict=None,
+        patience:int=5,
+        max_epochs:int=50,
+        reduction_factor:int=3,
+        tpe_kwargs:dict=None,
         study_kwargs:dict=None,
         optimize_kwargs:dict=None
     ):
 
-    sampler_kwargs = sampler_kwargs or {'seed':0}
-    pruner_kwargs = pruner_kwargs or {'min_resource':5, 'max_resource':50, 'reduction_factor':5}
+    tpe_kwargs = tpe_kwargs or {'seed':0}
     study_kwargs = study_kwargs or {}
     optimize_kwargs = optimize_kwargs or {'n_trials':100}
 
@@ -29,7 +30,7 @@ def vmd_tcn_lstm_mha_hpo(
 
         #### general params ####
         batch_size = trial.suggest_int('batch_size', 16, 64, log=True)
-        lr_init = trial.suggest_float('lr_init', 1e-4, 1e-2, log=True)
+        lr_init = trial.suggest_float('lr_init', 1e-4, 1e-1, log=True)
 
         #### TCN params ####
         dilation_base = 2
@@ -71,11 +72,11 @@ def vmd_tcn_lstm_mha_hpo(
         #### callbacks ####
         callbacks = [
             optuna.integration.PyTorchLightningPruningCallback(trial, monitor='val_loss'),
-            pl.callbacks.EarlyStopping(monitor='val_loss', patience=5)
+            pl.callbacks.EarlyStopping(monitor='val_loss', patience=patience)
         ]
 
         #### training ####
-        val_losses = np.zeros(3)
+        val_losses = np.zeros(num_splits)
 
         for i in range(1, num_splits+1):
             datamodule = EPFDataModule(
@@ -110,8 +111,8 @@ def vmd_tcn_lstm_mha_hpo(
 
         return np.mean(val_losses)
     
-    sampler = optuna.samplers.TPESampler(**sampler_kwargs)
-    pruner = optuna.pruners.HyperbandPruner(**pruner_kwargs)
+    sampler = optuna.samplers.TPESampler(**tpe_kwargs)
+    pruner = optuna.pruners.HyperbandPruner(min_resource=patience, max_resource=max_epochs, reduction_factor=reduction_factor)
     study = optuna.create_study(direction='minimize', sampler=sampler, pruner=pruner, **study_kwargs)
     study.optimize(objective, **optimize_kwargs)
 
