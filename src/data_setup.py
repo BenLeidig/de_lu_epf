@@ -1,5 +1,6 @@
 from joblib import dump
 import pandas as pd
+import numpy as np
 from sklearn.preprocessing import StandardScaler
 from sktime.transformations.series.vmd import VmdTransformer
 import torch
@@ -107,13 +108,22 @@ class EPFDataModule(pl.LightningDataModule):
         self.batch_size = batch_size
 
     def setup(self, stage=None):
-        X_train = torch.tensor(pd.read_pickle(self.X_train_path).to_numpy(), dtype=torch.float32)
-        X_val = torch.tensor(pd.read_pickle(self.X_val_path).to_numpy(), dtype=torch.float32)
-        y_train = torch.tensor(pd.read_pickle(self.y_train_path).to_numpy()[:, self.imf-1], dtype=torch.float32)
-        y_val = torch.tensor(pd.read_pickle(self.y_val_path).to_numpy()[:, self.imf-1], dtype=torch.float32)
+        X_train = pd.read_pickle(self.X_train_path).to_numpy()
+        X_val = pd.read_pickle(self.X_val_path).to_numpy()
+        y_train = pd.read_pickle(self.y_train_path).to_numpy()
+        y_val = pd.read_pickle(self.y_val_path).to_numpy()
+        
+        X_train = np.concatenate([X_train, y_train], axis=1)
+        X_val = np.concatenate([X_val, y_val], axis=1)
 
-        self.train_dataset = EPFDataset(X_train, y_train)
-        self.val_dataset = EPFDataset(X_val, y_val)
+        self.train_dataset = EPFDataset(
+            torch.tensor(X_train, dtype=torch.float32),
+            torch.tensor(y_train[:, self.imf-1], dtype=torch.float32)
+        )
+        self.val_dataset = EPFDataset(
+            torch.tensor(X_val, dtype=torch.float32),
+            torch.tensor(y_val[:, self.imf-1], dtype=torch.float32)
+        )
     
     def train_dataloader(self):
         return DataLoader(

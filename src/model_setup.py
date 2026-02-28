@@ -91,7 +91,7 @@ class TCN_LSTM_MHA(pl.LightningModule):
         x, y = batch
         y_hat = self(x)
         val_loss = self.criterion(y_hat, y)
-        self.log('val_loss', val_loss, on_step=False, on_epoch=True, prog_bar=True)
+        self.log('val_loss', val_loss, on_step=False, on_epoch=True)
         return val_loss
     
     def predict_step(self, batch, batch_idx):

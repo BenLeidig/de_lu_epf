@@ -1,7 +1,7 @@
+import gc
 import numpy as np
-
+import torch
 import lightning.pytorch as pl
-
 import optuna
 
 from data_setup import EPFDataModule
@@ -12,8 +12,7 @@ def vmd_tcn_lstm_mha_hpo(
         imf:int,
         data_dir:str,
         seq_len:int=24*7*4,
-        input_size:int=10,
-        num_splits:int=2,
+        input_size:int=16,
         patience:int=5,
         max_epochs:int=50,
         reduction_factor:int=3,
@@ -69,48 +68,59 @@ def vmd_tcn_lstm_mha_hpo(
         mha_heads = trial.suggest_categorical('mha_heads', [1, 2, 4, 8, 16])
         if hidden_sizes[-1]%mha_heads != 0:
             raise optuna.TrialPruned()
-
+        
         #### callbacks ####
         callbacks = [
-            optuna.integration.PyTorchLightningPruningCallback(trial, monitor='val_loss'),
-            pl.callbacks.EarlyStopping(monitor='val_loss', patience=patience)
+            pl.callbacks.EarlyStopping(
+                monitor='val_loss',
+                patience=patience,
+                mode='min'
+            ),
+            optuna.integration.PyTorchLightningPruningCallback(
+                trial,
+                monitor='val_loss'
+            )
         ]
 
         #### training ####
-        val_losses = np.zeros(num_splits)
+        datamodule = EPFDataModule(     ## making the dataset considering the batch_size
+            X_train_path=f'{data_dir}df_train_scaled.pkl',
+            X_val_path=f'{data_dir}df_val_scaled.pkl',
+            y_train_path=f'{data_dir}df_train_imf_scaled.pkl',
+            y_val_path=f'{data_dir}df_val_imf_scaled.pkl',
+            imf=imf,
+            batch_size=batch_size
+        )
+        mod = TCN_LSTM_MHA(     ## instantiating the model
+            input_size=input_size,
+            channel_sizes=channel_sizes,
+            kernel_size=kernel_size,
+            hidden_sizes=hidden_sizes,
+            tcn_dropout=tcn_dropout,
+            lstm_dropouts=lstm_dropouts,
+            mha_dropout=mha_dropout,
+            mha_heads=mha_heads,
+            lr_init=lr_init
+        )
+        
+        trainer = pl.Trainer(   ## instantiating the trainer given the model and callbacks
+            max_epochs=max_epochs,
+            callbacks=callbacks,
+            accelerator=accelerator,
+            logger=False,
+            enable_checkpointing=False,
+            gradient_clip_val=1.0,
+            gradient_clip_algorithm='norm'
+        )
+        trainer.fit(mod, datamodule=datamodule)     ## fitting the trainer
+        val_loss = trainer.callback_metrics['val_loss'].item()      ## finding the loss
+        
+        del trainer, mod, datamodule
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        gc.collect()
 
-        for i in range(1, num_splits+1):
-            datamodule = EPFDataModule(
-                X_train_path=f'{data_dir}df_train{i}_scaled.pkl',
-                X_val_path=f'{data_dir}df_val{i}_scaled.pkl',
-                y_train_path=f'{data_dir}df_train{i}_imf_scaled.pkl',
-                y_val_path=f'{data_dir}df_val{i}_imf_scaled.pkl',
-                imf=imf,
-                batch_size=batch_size
-            )
-            mod = TCN_LSTM_MHA(
-                input_size=input_size,
-                channel_sizes=channel_sizes,
-                kernel_size=kernel_size,
-                hidden_sizes=hidden_sizes,
-                tcn_dropout=tcn_dropout,
-                lstm_dropouts=lstm_dropouts,
-                mha_dropout=mha_dropout,
-                mha_heads=mha_heads,
-                lr_init=lr_init
-            )
-            
-            trainer = pl.Trainer(
-                max_epochs=max_epochs,
-                callbacks=callbacks,
-                accelerator=accelerator,
-                logger=False,
-                enable_checkpointing=False
-            )
-            trainer.fit(mod, datamodule=datamodule)
-            val_losses[i-1] = trainer.callback_metrics['val_loss'].item()
-
-        return np.mean(val_losses)
+        return val_loss     ## report the loss
     
     sampler = optuna.samplers.TPESampler(**tpe_kwargs)
     pruner = optuna.pruners.HyperbandPruner(min_resource=patience, max_resource=max_epochs, reduction_factor=reduction_factor)
