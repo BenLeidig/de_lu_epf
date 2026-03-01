@@ -144,7 +144,7 @@ def get_fitted(
         batch_size=batch_size
     )
 
-    model = TCN_LSTM_MHA(input_size=8, **params)
+    model = TCN_LSTM_MHA(input_size=16, **params)
     trainer = pl.Trainer(
         max_epochs=max_epochs,
         callbacks=pl.callbacks.EarlyStopping(monitor='val_loss', patience=patience),

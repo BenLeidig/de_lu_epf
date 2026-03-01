@@ -17,4 +17,4 @@ if __name__ == '__main__':
         optimize_kwargs={'n_trials':1_000},
         accelerator='gpu'
     )
-    dump(study, f'imf{imf}_tcn_lstm_mha_study.pkl')
+    dump(study, 'resid_tcn_lstm_mha_study.pkl')
