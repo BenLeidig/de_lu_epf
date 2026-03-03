@@ -21,7 +21,7 @@ class TCN_LSTM_MHA(pl.LightningModule):
     ):
         super().__init__()
         self.save_hyperparameters()
-        self.criterion = torch.nn.MSELoss()
+        self.criterion = torch.nn.L1Loss()
         self.lr_init = lr_init
 
         #### model ####
@@ -91,7 +91,7 @@ class TCN_LSTM_MHA(pl.LightningModule):
         x, y = batch
         y_hat = self(x)
         val_loss = self.criterion(y_hat, y)
-        self.log('val_loss', val_loss, on_step=False, on_epoch=True, prog_bar=True)
+        self.log('val_loss', val_loss, on_step=False, on_epoch=True)
         return val_loss
     
     def predict_step(self, batch, batch_idx):

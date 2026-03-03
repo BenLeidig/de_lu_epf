@@ -5,10 +5,16 @@ from hpo import vmd_tcn_lstm_mha_hpo
 NETID = os.environ['USER']
 SCRATCH_PATH = f'/scratch/{NETID}/'
 
+imf = 4
+
 if __name__ == '__main__':
     study = vmd_tcn_lstm_mha_hpo(
-        imf=4,
+        imf=imf,
         data_dir=SCRATCH_PATH,
-        optimize_kwargs={'n_trials':500}
+        patience=15,
+        max_epochs=200,
+        reduction_factor=3,
+        optimize_kwargs={'n_trials':1_000},
+        accelerator='gpu'
     )
-    dump(study, 'imf4_tcn_lstm_mha_study.pkl')
+    dump(study, f'imf{imf}_tcn_lstm_mha_study.pkl')
