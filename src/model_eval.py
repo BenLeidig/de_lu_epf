@@ -9,8 +9,8 @@ import lightning.pytorch as pl
 
 from sklearn.metrics import r2_score, root_mean_squared_error, mean_absolute_error
 
-from data_setup import EPFDataset, EPFDataModule
-from model_setup import TCN_LSTM_MHA
+from .data_setup import EPFDataset, EPFDataModule
+from .model_setup import TCN_LSTM_MHA
 
 
 def willmotts_index(y_true, y_pred):
@@ -97,19 +97,16 @@ def absolute_percentage_bias(y_true, y_pred):
     return apb
 
 
-def evaluate_model(model, X, y_true) -> pd.DataFrame:
-    """
-    model   :   A pre-trained model object.
-    X       :   Feature matrix. Should be in the format your model object requires.
-    y_true  :   True target array for prediction evaluation.
-    """
+def evaluate_model(y_true, y_pred) -> pd.DataFrame:
+    """Provide a model evaluation table.
 
-    if hasattr(model, "predict"):
-        y_pred = model.predict(X)
-    elif callable(model):
-        y_pred = model(X)
-    else:
-        raise TypeError("Model must be callable or have a .predict() method.")
+    Args:
+        y_true (iterable): Actual response values.
+        y_pred (iterable): Predicted response values.
+
+    Returns:
+        pd.DataFrame: Evaluation table.
+    """
 
     abbr = [
         "r2",
@@ -140,7 +137,7 @@ def evaluate_model(model, X, y_true) -> pd.DataFrame:
         theils_inequality_coefficient,
         absolute_percentage_bias,
     ]
-    results = [metric(y_true=y_true, y_pred=y_pred) for metric in metrics]
+    results = [round(metric(y_true=y_true, y_pred=y_pred), 4) for metric in metrics]
 
     df = pd.DataFrame(
         data=list(zip(prop, abbr, results)), columns=["property", "metric", "score"]
