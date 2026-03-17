@@ -1,0 +1,59 @@
+# Here we specify the variables to be kept,
+# the column containing datetime indexing,
+# the datetime offset for time alignment,
+# and the parameters for datetime conversion
+# for each data source.
+data_source:
+  weather:
+    variables: [precipitation, temperature, relative_humidity]
+    dt_col: timestamp
+    dt_delta: -1
+    dt_params:
+      format: ISO8601
+      utc: True
+
+  price:
+    variables: [price]
+    dt_col: unix_seconds
+    dt_delta: 0
+    dt_params:
+      unit: s
+      utc: True
+
+  production:
+    variables: [load, renewable_share_of_load, renewable_share_of_generation]
+    nest_key: production_types  # key for the nested dictionary containing data
+    dt_col: unix_seconds
+    dt_delta: -1
+    dt_params:
+      unit: s
+      utc: True
+
+  trade:
+    variables: [sum_cbet]
+    nest_key: countries  # key for the nested dictionary containing data
+    dt_col: unix_seconds
+    dt_delta: -1
+    dt_params:
+      unit: s
+      utc: True
+
+# Here we specify train-val-test split indices.
+# Train:      2019 - 2023
+# Validation: 2023 - 2024
+# Test:       2024 - 2025
+dt_range:
+  start: '2019-01-01 00:00:00+00:00'
+  end: '2024-12-31 23:00:00+00:00'
+
+  train:
+    start: '2019-01-01 00:00:00+00:00'
+    end: '2022-12-31 23:00:00+00:00'
+
+  val:
+    start: '2023-01-01 00:00:00+00:00'
+    end: '2023-12-31 23:00:00+00:00'
+
+  test:
+    start: '2024-01-01 00:00:00+00:00'
+    end: '2024-12-31 23:00:00+00:00'
