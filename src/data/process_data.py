@@ -1,7 +1,6 @@
 import json
 from functools import reduce
 from pathlib import Path
-from re import split
 
 import pandas as pd
 import yaml
@@ -83,41 +82,21 @@ def subset_df(df: pd.DataFrame, subset: list):
     return df[subset]
 
 
-def get_splits(df: pd.DataFrame, split_list: list):
-    """Get the splits for the provided DataFrame at the specified split datetimes.
+if __name__ == "__main__":
+    # Set configs
+    with open("configs/data/process_config.yaml") as f:
+        cfg = yaml.safe_load(f)
+    source_cfg = cfg["data_source"]
 
-    Args:
-        df (pd.DataFrame): DataFrame to split. Must have a datetime (UTC) index.
-        split_list (list): List of tuples with (start, end) datetime (UTC) format for each split.
+    dir = Path("data/external")  ## External data directory
+    merge_list = []  ## Listing of separate data source DataFrames
 
-    Returns:
-        tuple: Tuple of DataFrame splits.
-    """
-    splits = []
-    for start, end in split_list:
-        idx = df.index
-        start = idx.searchsorted(pd.to_datetime(start, utc=True))
-        end = idx.searchsorted(pd.to_datetime(end, utc=True))
-        splits.append(df.iloc[start:end])
-    return tuple(splits)
-
-
-# Set configs
-with open("configs/data/process_config.yaml") as f:
-    cfg = yaml.safe_load(f)
-source_cfg = cfg["data_source"]
-dt_cfg = cfg["dt_range"]
-
-dir = Path("data/external")  ## External data directory
-merge_list = []  ## Listing of separate data source DataFrames
-
-
-# Create a DataFrame with the average German weather data (across 4 main cities)
-concat_list = []
-for f_path in dir.glob("*weather.json"):
-    t_cfg = source_cfg["weather"]
-    with open(f_path) as f:
-        j = json.load(f)
+    # Create a DataFrame with the average German weather data (across 4 main cities)
+    concat_list = []
+    for f_path in dir.glob("*weather.json"):
+        t_cfg = source_cfg["weather"]
+        with open(f_path) as f:
+            j = json.load(f)
         t_df = add_dt_col(
             j["weather"],
             dt_col=t_cfg["dt_col"],
@@ -127,14 +106,14 @@ for f_path in dir.glob("*weather.json"):
         )
         t_df = subset_df(t_df, t_cfg["variables"] + ["datetime"])
         concat_list.append(t_df)
-weather_df = pd.concat(concat_list, axis=0)
-weather_df = weather_df.groupby("datetime", as_index=False).agg("mean")
-merge_list.append(weather_df)
+    weather_df = pd.concat(concat_list, axis=0)
+    weather_df = weather_df.groupby("datetime", as_index=False).agg("mean")
+    merge_list.append(weather_df)
 
-# Create a DataFrame with day-ahead price data
-price_cfg = source_cfg["price"]
-with open("data/external/price.json") as f:
-    j = json.load(f)
+    # Create a DataFrame with day-ahead price data
+    price_cfg = source_cfg["price"]
+    with open("data/external/price.json") as f:
+        j = json.load(f)
     price_df = add_dt_col(
         j,
         dt_col=price_cfg["dt_col"],
@@ -145,10 +124,10 @@ with open("data/external/price.json") as f:
     price_df = subset_df(price_df, price_cfg["variables"] + ["datetime"])
     merge_list.append(price_df)
 
-# Create a DataFrame with electricity production data
-production_cfg = source_cfg["production"]
-with open("data/external/production.json") as f:
-    j = json.load(f)
+    # Create a DataFrame with electricity production data
+    production_cfg = source_cfg["production"]
+    with open("data/external/production.json") as f:
+        j = json.load(f)
     production_df = add_dt_col(
         j,
         dt_col=production_cfg["dt_col"],
@@ -163,55 +142,27 @@ with open("data/external/production.json") as f:
     production_df = subset_df(production_df, production_cfg["variables"] + ["datetime"])  # type: ignore
     merge_list.append(production_df)
 
-# Create a DataFrame with electricity trading data
-trade_cfg = source_cfg["trade"]
-with open("data/external/trade.json") as f:
-    j = json.load(f)
-    trade_df = add_dt_col(
-        j,
-        dt_col=trade_cfg["dt_col"],
-        dt_params=trade_cfg["dt_params"],
-        dt_delta=trade_cfg["dt_delta"],
-        empty=True,
-    )
-    trade_df = normalize_external(j, trade_df, nest_key=trade_cfg["nest_key"])
-    trade_df = make_hr_freq(trade_df)
-    trade_df = trade_df.rename({"sum": "sum_cbet"}, axis=1)
-    trade_df = subset_df(trade_df, trade_cfg["variables"] + ["datetime"])  # type: ignore
-    merge_list.append(trade_df)
+    # Create a DataFrame with electricity trading data
+    trade_cfg = source_cfg["trade"]
+    with open("data/external/trade.json") as f:
+        j = json.load(f)
+        trade_df = add_dt_col(
+            j,
+            dt_col=trade_cfg["dt_col"],
+            dt_params=trade_cfg["dt_params"],
+            dt_delta=trade_cfg["dt_delta"],
+            empty=True,
+        )
+        trade_df = normalize_external(j, trade_df, nest_key=trade_cfg["nest_key"])
+        trade_df = make_hr_freq(trade_df)
+        trade_df = trade_df.rename({"sum": "sum_cbet"}, axis=1)
+        trade_df = subset_df(trade_df, trade_cfg["variables"] + ["datetime"])  # type: ignore
+        merge_list.append(trade_df)
 
-# Merge DataFrames
-df = reduce(
-    lambda l, r: l.merge(r, on="datetime", how="outer"), merge_list
-).sort_values(by="datetime", ascending=True)
-df = df.set_index("datetime")
+    # Merge DataFrames
+    df = reduce(
+        lambda l, r: l.merge(r, on="datetime", how="outer"), merge_list
+    ).sort_values(by="datetime", ascending=True)
+    df = df.set_index("datetime")
 
-# Calculating rolling mean and variance
-df["168_mean_price"] = df["price"].rolling(window=24 * 7 * 4).mean()
-df["24_mean_price"] = df["price"].rolling(window=24).mean()
-
-df["168_var_price"] = df["price"].rolling(window=24 * 7 * 4).var()
-df["24_var_price"] = df["price"].rolling(window=24).var()
-
-#### ANN-Specific Data Adjusting ####
-ann_df = df.copy(deep=True)
-
-# Lagging non-price covariates to abide by day-head constraint
-## i.e., prices are determined at noon the day before, so we have price data up until last
-## hour of the day (since prices are pre-determined), but not exogenous (non-price) data.
-for col in ann_df.columns:
-    if "price" not in col:
-        ann_df.loc[:, col] = ann_df[col].shift(12)
-
-# Train-val-test splits
-split_list = []
-for k in ["train", "val", "test"]:
-    split_list.append((dt_cfg[k]["start"], dt_cfg[k]["end"]))
-
-ann_splits = get_splits(df, split_list)
-ann_split_names = ["ann_train", "ann_val", "ann_test"]
-for n, s in zip(ann_split_names, ann_splits):
-    s.to_parquet(f"data/interim/{n}.parquet")
-
-ann_train_val = pd.concat(ann_splits[:2], axis=0)
-ann_train_val.to_parquet("data/interim/ann_train_val.parquet")
+    df.to_parquet("data/interim/processed.parquet", index=True)
