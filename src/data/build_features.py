@@ -38,15 +38,25 @@ if __name__ == "__main__":
     for r in rolling_var_lengths:
         df[f"{r}_rvar_price"] = df["price"].rolling(window=r).var()
 
-    # Train-val-test splits
-    split_list = []
-    for k in ["train", "val", "test"]:
-        split_list.append((dt_cfg[k]["start"], dt_cfg[k]["end"]))
+    #### #### ANN-Specific Data Adjusting #### ####
+    ann_df = df.copy(deep=True)
 
-    splits = get_splits(df, split_list)
-    split_names = ["train", "val", "test"]
-    for n, s in zip(split_names, splits):
+    # Lagging non-price covariates to abide by day-head constraint
+    ## i.e., prices are determined at noon the day before, so we have price data up until last
+    ## hour of the day (since prices are pre-determined), but not exogenous (non-price) data.
+    for col in ann_df.columns:
+        if "price" not in col:
+            ann_df.loc[:, col] = ann_df[col].shift(12)
+
+    # Train-val-test splits
+    ann_split_list = []
+    for k in ["train", "val", "test"]:
+        ann_split_list.append((dt_cfg[k]["start"], dt_cfg[k]["end"]))
+
+    ann_splits = get_splits(ann_df, ann_split_list)
+    ann_split_names = ["ann_train", "ann_val", "ann_test"]
+    for n, s in zip(ann_split_names, ann_splits):
         s.to_parquet(f"data/interim/{n}.parquet", index=True)
 
-    train_val = pd.concat(splits[:2], axis=0)
-    train_val.to_parquet("data/interim/train_val.parquet", index=True)
+    ann_train_val = pd.concat(ann_splits[:2], axis=0)
+    ann_train_val.to_parquet("data/interim/ann_train_val.parquet", index=True)

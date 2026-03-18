@@ -4,7 +4,7 @@ import torch
 import lightning.pytorch as pl
 import optuna
 
-from src.data.data_setup import EPFDataModule
+from src.data_setup import EPFDataModule
 from model_setup import TCN_LSTM_MHA
 
 

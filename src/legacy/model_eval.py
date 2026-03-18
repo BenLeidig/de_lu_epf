@@ -9,7 +9,7 @@ import lightning.pytorch as pl
 
 from sklearn.metrics import r2_score, root_mean_squared_error, mean_absolute_error
 
-from .data.data_setup import EPFDataset, EPFDataModule
+from .data_setup import EPFDataset, EPFDataModule
 from .model_setup import TCN_LSTM_MHA
 
 

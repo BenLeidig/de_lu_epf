@@ -157,14 +157,17 @@ def find_fc_sd(df: pd.DataFrame):
 
 
 if __name__ == "__main__":
+    # Set paths
     BASE_DIR = Path(__file__).resolve().parent.parent.parent
     cfg_path = BASE_DIR / "configs/model/hpo_config.yaml"
-    data_path = BASE_DIR / "data/interim/train_val.parquet"
+    data_path = BASE_DIR / "data/interim/ann_train_val.parquet"
     output_path = BASE_DIR / "reports/figures/vmd_hpo"
 
+    # Set configs
     with open("configs/model/hpo_config.yaml") as f:
         cfg = yaml.safe_load(f)["vmd"]
 
+    # Read data
     train_val_price = pd.read_parquet(data_path)["price"].to_numpy()
 
     fc_dict = {}
@@ -175,6 +178,7 @@ if __name__ == "__main__":
     alpha = cfg["alpha"]
     random_state = cfg["random_state"]
 
+    # Pack IMF analysis data into DataFrame
     for K in range(K_min, K_max + 1):
         fc_dict[K], corr_dict[K] = vmd_hpo(
             K=K, alpha=alpha, random_state=random_state, y=train_val_price
@@ -203,6 +207,7 @@ if __name__ == "__main__":
         ],
     ).sort_values(by="K", ascending=True)
 
+    # Iterative plotting of center frequency figures
     cols = ["fc_max", "CFR (max/min)", "CFR (RoC)", "CFR (K/(K-1))", "fc_sd"]
     labels = [
         r"$\max F_c$",
@@ -232,6 +237,7 @@ if __name__ == "__main__":
             output_path / f"{col.lower().replace(' ', '_').replace('/', '_')}.svg"
         )
 
+    # Plot IMF correlation analysis
     fig, ax = plt.subplots(figsize=(6, 4))
     sns.lineplot(
         data=df,
