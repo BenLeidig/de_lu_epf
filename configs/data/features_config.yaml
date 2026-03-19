@@ -1,24 +1,4 @@
 # Specify the length and number of rolling statistics
 rolling_stats:
-  mean: [24, 168]  ## 24hr rolling & monthly rolling
-  var:  [24, 168]
-
-# Here we specify train-val-test split indices.
-# Train:      2019 - 2023
-# Validation: 2023 - 2024
-# Test:       2024 - 2025
-dt_range:
-  start: '2019-01-01 00:00:00+00:00'
-  end: '2024-12-31 23:00:00+00:00'
-
-  train:
-    start: '2019-01-01 00:00:00+00:00'
-    end: '2022-12-31 23:00:00+00:00'
-
-  val:
-    start: '2023-01-01 00:00:00+00:00'
-    end: '2023-12-31 23:00:00+00:00'
-
-  test:
-    start: '2024-01-01 00:00:00+00:00'
-    end: '2024-12-31 23:00:00+00:00'
+  mean: [24, 168, 672]  ## daily, weekly, & monthly rolling
+  var:  [24, 168, 672]

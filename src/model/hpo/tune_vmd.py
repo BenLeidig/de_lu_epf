@@ -157,10 +157,12 @@ def find_fc_sd(df: pd.DataFrame):
 
 
 if __name__ == "__main__":
+    print("+" * 8, " `tune_vmd.py` started. ", "+" * 8)
+
     # Set paths
     BASE_DIR = Path(__file__).resolve().parent.parent.parent
     cfg_path = BASE_DIR / "configs/model/hpo_config.yaml"
-    data_path = BASE_DIR / "data/interim/ann_train_val.parquet"
+    data_path = BASE_DIR / "data/processed/processed.parquet"
     output_path = BASE_DIR / "reports/figures/vmd_hpo"
 
     # Set configs
@@ -257,3 +259,5 @@ if __name__ == "__main__":
     ax.axvline(5, color="tab:red", linestyle="--")
     fig.tight_layout()
     fig.savefig(output_path / "imf_correlation.svg")
+
+    print("+" * 8, " `tune_vmd.py` completed. ", "+" * 8)

@@ -83,17 +83,24 @@ def subset_df(df: pd.DataFrame, subset: list):
 
 
 if __name__ == "__main__":
+    print("+" * 8, " `merge_data.py` started. ", "+" * 8)
+
+    # Set paths
+    BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
+    cfg_path = BASE_DIR / "configs"
+    external_data_path = BASE_DIR / "data/external"
+    interim_data_path = BASE_DIR / "data/interim"
+
     # Set configs
-    with open("configs/data/process_config.yaml") as f:
+    with open(cfg_path / "data/process_config.yaml") as f:
         cfg = yaml.safe_load(f)
     source_cfg = cfg["data_source"]
 
-    dir = Path("data/external")  ## External data directory
     merge_list = []  ## Listing of separate data source DataFrames
 
     # Create a DataFrame with the average German weather data (across 4 main cities)
     concat_list = []
-    for f_path in dir.glob("*weather.json"):
+    for f_path in external_data_path.glob("*weather.json"):
         t_cfg = source_cfg["weather"]
         with open(f_path) as f:
             j = json.load(f)
@@ -112,7 +119,7 @@ if __name__ == "__main__":
 
     # Create a DataFrame with day-ahead price data
     price_cfg = source_cfg["price"]
-    with open("data/external/price.json") as f:
+    with open(external_data_path / "price.json") as f:
         j = json.load(f)
     price_df = add_dt_col(
         j,
@@ -126,7 +133,7 @@ if __name__ == "__main__":
 
     # Create a DataFrame with electricity production data
     production_cfg = source_cfg["production"]
-    with open("data/external/production.json") as f:
+    with open(external_data_path / "production.json") as f:
         j = json.load(f)
     production_df = add_dt_col(
         j,
@@ -144,20 +151,20 @@ if __name__ == "__main__":
 
     # Create a DataFrame with electricity trading data
     trade_cfg = source_cfg["trade"]
-    with open("data/external/trade.json") as f:
+    with open(external_data_path / "trade.json") as f:
         j = json.load(f)
-        trade_df = add_dt_col(
-            j,
-            dt_col=trade_cfg["dt_col"],
-            dt_params=trade_cfg["dt_params"],
-            dt_delta=trade_cfg["dt_delta"],
-            empty=True,
-        )
-        trade_df = normalize_external(j, trade_df, nest_key=trade_cfg["nest_key"])
-        trade_df = make_hr_freq(trade_df)
-        trade_df = trade_df.rename({"sum": "sum_cbet"}, axis=1)
-        trade_df = subset_df(trade_df, trade_cfg["variables"] + ["datetime"])  # type: ignore
-        merge_list.append(trade_df)
+    trade_df = add_dt_col(
+        j,
+        dt_col=trade_cfg["dt_col"],
+        dt_params=trade_cfg["dt_params"],
+        dt_delta=trade_cfg["dt_delta"],
+        empty=True,
+    )
+    trade_df = normalize_external(j, trade_df, nest_key=trade_cfg["nest_key"])
+    trade_df = make_hr_freq(trade_df)
+    trade_df = trade_df.rename({"sum": "sum_cbet"}, axis=1)
+    trade_df = subset_df(trade_df, trade_cfg["variables"] + ["datetime"])  # type: ignore
+    merge_list.append(trade_df)
 
     # Merge DataFrames
     df = reduce(
@@ -165,4 +172,7 @@ if __name__ == "__main__":
     ).sort_values(by="datetime", ascending=True)
     df = df.set_index("datetime")
 
-    df.to_parquet("data/interim/processed.parquet", index=True)
+    # Saving data
+    df.to_parquet(interim_data_path / "merged.parquet", index=True)
+
+    print("+" * 8, " `merge_data.py` completed. ", "+" * 8)
