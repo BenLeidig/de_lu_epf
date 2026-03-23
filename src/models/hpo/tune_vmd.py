@@ -161,12 +161,12 @@ if __name__ == "__main__":
 
     # Set paths
     BASE_DIR = Path(__file__).resolve().parent.parent.parent
-    cfg_path = BASE_DIR / "configs/model/hpo_config.yaml"
+    cfg_path = BASE_DIR / "configs/models/hpo_config.yaml"
     data_path = BASE_DIR / "data/processed/processed.parquet"
     output_path = BASE_DIR / "reports/figures/vmd_hpo"
 
     # Set configs
-    with open("configs/model/hpo_config.yaml") as f:
+    with open(cfg_path) as f:
         cfg = yaml.safe_load(f)["vmd"]
 
     # Read data

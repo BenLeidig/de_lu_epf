@@ -1,7 +1,0 @@
-# Variational Mode Decomposition ranges
-vmd:
-  K:
-    min: 2
-    max: 20
-  alpha: 4000
-  random_state: 0
