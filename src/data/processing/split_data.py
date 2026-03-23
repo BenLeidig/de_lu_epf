@@ -23,13 +23,13 @@ def get_splits(df: pd.DataFrame, split_list: list):
     return tuple(splits)
 
 
-def save_splits(df: pd.DataFrame, split_list: list, path):
+def save_splits(df: pd.DataFrame, split_list: list, path: Path):
     """Save the train, val, train_val, test splits for the given DataFrame, specified list of date tuples, and save path.
 
     Args:
         df (pd.DataFrame): DataFrame to split. Must have a datetime (UTC) index.
         split_list (list): List of tuples with (start, end) datetime (UTC) format for each split.
-        path (_type_): Path to save splits.
+        path (Path): Path to save splits.
     """
     split_names = ["train", "val", "test"]
     splits = get_splits(df, split_list)
@@ -55,6 +55,7 @@ if __name__ == "__main__":
 
     # Load data
     df = pd.read_parquet(data_path / "processed/processed.parquet")
+    df_dmf = pd.read_parquet(data_path / "processed/dmf_data/processed.parquet")
 
     # Get split list (list of dates for each split)
     split_names = ["train", "val", "test"]
@@ -64,9 +65,10 @@ if __name__ == "__main__":
 
     #### #### ANN-specific data splits #### ####
     save_splits(df, split_list, path=data_path / "processed/ann_data")
-    print("Saved ANN splits.")
+    print("-" * 8, "Saved ANN splits.", "-" * 8)
 
     #### #### DMF-specific data splits #### ####
-    # coming soon...
+    save_splits(df_dmf, split_list, path=data_path / "processed/dmf_data")
+    print("-" * 8, "Saved DMF splits.", "-" * 8)
 
     print("+" * 8, " `split_data.py` completed. ", "+" * 8)

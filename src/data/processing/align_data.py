@@ -20,6 +20,6 @@ if __name__ == "__main__":
             df.loc[:, col] = df[col].shift(12)
 
     # Saving data
-    df.to_parquet(data_path / "interim/aligned.parquet")
+    df.to_parquet(data_path / "interim/aligned.parquet", index=True)
 
     print("+" * 8, " `align_data.py` completed. ", "+" * 8)
