@@ -1,0 +1,4 @@
+# Specify the length and number of rolling statistics
+rolling_stats:
+  mean: [24, 168, 672]  ## daily, weekly, & monthly rolling
+  var:  [24, 168, 672]

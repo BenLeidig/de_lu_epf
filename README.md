@@ -1,42 +1,7 @@
-# Machine Learning and Deep Learning Methods for Electricity Day-Ahead Price Forecasting
+# Evaluating Hybrid Deep Learning Architectures for Day-Ahead Electricity Price Forecasting in the German Spot Market
 
 ### Abstract
-As socio-economic dependence on electricity prices increases, the ability to anticipate price fluctuations is essential for maintaining system stability. While statistical forecasting methods attempt to address this need, artificial neural networks often fail to capture the innate volatility of electricity prices due to overfitting. Other approaches, including modern machine learning methods and energy system models, often perform better during volatile periods but demonstrate reduced accuracy under typical price fluctuations. To address this challenge, we systematically evaluate the performance of deep learning, machine learning, and data manipulation methodologies across both stable and volatile market conditions. The models we use consider a wide range of external variables, like grid load, cross-border electricity trading volume, and weather, to capture more complex and long-term patterns in prices. Logistical constraints regarding real-time electricity trading–such as prices being set for each hour the next day, all at once on the day before–are carefully considered in our dataset formation. Additionally, techniques like the mirror-logarithmic transformation and target normalization are used for reducing the impact of historical price spikes in model fitting. Ultimately, we compare numerous modern machine learning methods against more complex deep learning models, including a contrast of bias and variance metrics of test set predictions among models.
+Forecasting day-ahead electricity prices is a longstanding focus of econometric research and energy market participants. Prior studies indicate that contemporary approaches, including hybrid and deep learning techniques, have become increasingly used in recent years. However, the complexity and resource requirements of advanced techniques make custom hybrid learning architectures challenging. For example, inconsistent adherence to temporal constraints is a recurring limitation. Additionally, inappropriate model interpretations and comparisons can lead to misleading conclusions, often due to the black-box nature of artificial neural networks. To address these limitations, a comprehensive selection of feature engineering and machine learning techniques was used to forecast hourly day-ahead electricity prices on the German spot market. This selection included architectures incorporating Variational Mode Decomposition, convolutional and recurrent neural networks, multi-head attention, and transformers, all under strict temporal training and forecasting constraints. The supervised models and signal decomposition techniques were tuned using Bayesian optimization and frequency separation analyses, respectively. To compare real-time performance, these frameworks were tested on a year of hourly German price data. The results revealed that novel hybrid deep learning architectures demonstrated superior performance during regime changes and volatility spikes inherent to energy markets compared with traditional statistical methods.
 
 ### Repository Structure
-de_lu_epf/
-
-├── data/
-
-├── doc/
-
-├── models/
-
-├── results/
-
-├── src/
-
-├── LICENSE
-
-└── README.md
-
-* data/
-Contains all datasets.
-
-* doc/
-Jupyter notebooks for research work and thought process.
-
-* models/
-Stores trained model artifacts and related metadata.
-
-* results/
-Diagrams, plots, tables, and reports for analysis.
-
-* src/
-All source code, Python files, and utility scripts.
-
-* LICENSE
-License governing the project’s use and distribution.
-
-* README.md
-Top-level overview and project description.
+In progress.
