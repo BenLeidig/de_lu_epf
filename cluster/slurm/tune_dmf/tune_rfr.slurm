@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=tune_rfr
-#SBATCH --output=/u/$USER/de_lu_epf/logs/slurm/out/tune_rfr.out
-#SBATCH --error=/u/$USER/de_lu_epf/logs/slurm/err/tune_rfr.err
+#SBATCH --job-name=tune_rfr_hr%a
+#SBATCH --output=/u/%u/de_lu_epf/logs/slurm/out/tune_rfr_hr%a.out
+#SBATCH --error=/u/%u/de_lu_epf/logs/slurm/err/tune_rfr_hr%a.err
 #SBATCH --account=stat
 #SBATCH --partition=stat
 #SBATCH --nodes=1

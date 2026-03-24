@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=tune_svr
-#SBATCH --output=/u/$USER/de_lu_epf/logs/slurm/out/tune_svr.out
-#SBATCH --error=/u/$USER/de_lu_epf/logs/slurm/err/tune_svr.err
+#SBATCH --job-name=tune_svr_hr%a
+#SBATCH --output=/u/%u/de_lu_epf/logs/slurm/out/tune_svr_hr%a.out
+#SBATCH --error=/u/%u/de_lu_epf/logs/slurm/err/tune_svr_hr%a.err
 #SBATCH --account=stat
 #SBATCH --partition=stat
 #SBATCH --nodes=1

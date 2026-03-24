@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=tune_vtlm
-#SBATCH --output=/u/$USER/de_lu_epf/logs/slurm/out/tune_vtlm.out
-#SBATCH --error=/u/$USER/de_lu_epf/logs/slurm/err/tune_vtlm.err
+#SBATCH --job-name=tune_vtlm_imf%a
+#SBATCH --output=/u/%u/de_lu_epf/logs/slurm/out/tune_vtlm_imf%a.out
+#SBATCH --error=/u/%u/de_lu_epf/logs/slurm/err/tune_vtlm_imf%a.err
 #SBATCH --account=stat
 #SBATCH --partition=stat
 #SBATCH --nodes=1
