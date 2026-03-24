@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=vtlm_tune_imf4
-#SBATCH --output=/%u/de_lu_epf/logs/slurm/out/vtlm_tune_imf4.out
-#SBATCH --error=/%u/de_lu_epf/logs/slurm/err/vtlm_tune_imf4.err
+#SBATCH --job-name=tune_vtlm
+#SBATCH --output=/u/$USER/de_lu_epf/logs/slurm/out/tune_vtlm.out
+#SBATCH --error=/u/$USER/de_lu_epf/logs/slurm/err/tune_vtlm.err
 #SBATCH --account=stat
 #SBATCH --partition=stat
 #SBATCH --nodes=1
@@ -12,8 +12,9 @@
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=bleidig2@illinois.edu
 #SBATCH --time=168:00:00
+#SBATCH --array=0-5
 
 USER_DIR=/u/$USER
 
-source USER_DIR/venvs/.venv/bin/activate
-srun python USER_DIR/de_lu_epf/src/hpo/tune_vtlm/tune_imf4.py
+source $USER_DIR/venvs/.venv/bin/activate
+srun python $USER_DIR/de_lu_epf/src/hpo/tune_dmf/tune_vtlm.py

@@ -25,3 +25,161 @@ vmd-tcn-lstm-mha:
   accelerator: gpu
   random_state: 0
   ranges:
+
+# ElasticNet
+en:
+  alpha:
+    type: "float"
+    low: 1e-5
+    high: 1e3
+    log: True
+  l1_ratio:
+    type: "float"
+    low: 0
+    high: 1.0
+  fit_intercept:
+    type: "categorical"
+    choices: [True, False]
+  selection:
+    type: "constant"
+    value: "random"
+  random_state:
+    type: "constant"
+    value: 0
+
+# SVR
+svr:
+  kernel:
+    type: "constant"
+    value: "rbf"
+  C:
+    type: "float"
+    low: 1e-2
+    high: 1e3
+    log: True
+  epislon:
+    type: "float"
+    low: 1e-4
+    high: 1.0
+    log: True
+  gamma:
+    type: "float"
+    low: 1e-4
+    high: 1e1
+    log: True
+
+# XGBRegressor
+xgbr:
+  n_estimators:
+    type: "int"
+    low: 100
+    high: 1000
+  max_depth:
+    type: "int"
+    low: 3
+    high: 12
+  learning_rate:
+    type: "float"
+    low: 1e-3
+    high: 0.3
+    log: True
+  subsample:
+    type: "float"
+    low: 0.5
+    high: 1.0
+  colsample_bytree:
+    type: "float"
+    low: 0.5
+    high: 1.0
+  gamma:
+    type: "float"
+    low: 0.0
+    high: 5.0
+  reg_alpha:
+    type: "float"
+    low: 0.0
+    high: 1.0
+  reg_lambda:
+    type: "float"
+    low: 0.0
+    high: 1.0
+  booster:
+    type: "categorical"
+    choices: ["gbtree", "dart"]
+  random_state:
+    type: "constant"
+    value: 0
+
+# RandomForestRegressor
+rfr:
+  n_estimators:
+    type: "int"
+    low: 100
+    high: 1000
+  max_depth:
+    type: "int"
+    low: 3
+    high: 30
+  min_samples_split:
+    type: "int"
+    low: 2
+    high: 10
+  min_samples_leaf:
+    type: "int"
+    low: 1
+    high: 5
+  max_features:
+    type: "categorical"
+    choices: ["auto", "sqrt", "log2"]
+  bootstrap:
+    type: "constant"
+    value: True
+    random_state:
+    type: "constant"
+    value: 0
+
+# LGBMRegressor
+lgbmr:
+  n_estimators:
+    type: "int"
+    low: 100
+    high: 1000
+  max_depth:
+    type: "int"
+    low: 3
+    high: 15
+  learning_rate:
+    type: "float"
+    low: 1e-3
+    high: 0.3
+    log: True
+  num_leaves:
+    type: "int"
+    low: 20
+    high: 150
+  min_child_samples:
+    type: "int"
+    low: 5
+    high: 50
+  subsample:
+    type: "float"
+    low: 0.5
+    high: 1.0
+  colsample_bytree:
+    type: "float"
+    low: 0.5
+    high: 1.0
+  reg_alpha:
+    type: "float"
+    low: 0.0
+    high: 1.0
+  reg_lambda:
+    type: "float"
+    low: 0.0
+    high: 1.0
+  boosting_type:
+    type: "categorical"
+    choices: ["gbdt", "dart"]
+  random_state:
+    type: "constant"
+    value: 0

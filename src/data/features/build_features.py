@@ -27,6 +27,6 @@ if __name__ == "__main__":
         df[f"{r}_rvar_price"] = df["price"].rolling(window=r).var()
 
     # Save data
-    df.to_parquet(data_path / "processed/processed.parquet")
+    df.to_parquet(data_path / "processed/processed.parquet", index=True)
 
     print("+" * 8, " `build_features.py` completed. ", "+" * 8)

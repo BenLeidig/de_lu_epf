@@ -44,8 +44,8 @@ if __name__ == "__main__":
         df_test[[f"imf{i}" for i in range(1, 6)]] = test_imfs
 
         ## Add residual IMF (raw - sum(IMFs)) to DataFrames
-        df_train["imf_resid"] = train_price - np.sum(train_imfs)
-        df_test["imf_resid"] = test_price - np.sum(test_imfs)
+        df_train["imf_resid"] = train_price - np.sum(train_imfs)  # type: ignore
+        df_test["imf_resid"] = test_price - np.sum(test_imfs)  # type: ignore
 
         ## Save IMF DataFrame
         df_train.to_parquet(data_path / f"vmd_data/{train}.parquet", index=True)

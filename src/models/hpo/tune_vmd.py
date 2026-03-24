@@ -69,8 +69,8 @@ def vmd_hpo(K: int, alpha: int, random_state: int, y: np.ndarray):
         tuple[dict[int, float], dict[int, float]]: Tuple of (center frequency dictionary, and absolute Pearson correlation coefficient dictionary)
     """
     imfs = vmd_fit_transform(K=K, alpha=alpha, random_state=random_state, y=y)
-    fc_dict = {i: fc(imfs[:, i]) for i in range(imfs.shape[1])}
-    corr_dict = {i: abs_corrcoef(imfs[:, i], y) for i in range(imfs.shape[1])}
+    fc_dict = {i: fc(imfs[:, i]) for i in range(imfs.shape[1])}  # type: ignore
+    corr_dict = {i: abs_corrcoef(imfs[:, i], y) for i in range(imfs.shape[1])}  # type: ignore
     return fc_dict, corr_dict
 
 
@@ -84,7 +84,7 @@ def find_fc_max(df: pd.DataFrame):
         pd.DataFrame: DataFrame with the max center frequency for all modes for each K.
     """
     df_out = df[["K", "fc"]].groupby("K", as_index=False).agg("max")
-    df_out = df_out.rename(columns={"fc": "fc_max"})
+    df_out = df_out.rename(columns={"fc": "fc_max"})  # type: ignore
     return df_out
 
 
@@ -136,7 +136,7 @@ def find_cfr_K(df: pd.DataFrame):
         .groupby("K", as_index=False)
         .agg("max")
         .sort_values("K", ascending=True)
-    )
+    )  # type: ignore
     df_out["CFR (K/(K-1))"] = df_out["fc"] / df_out["fc"].shift(1)
     df_out = df_out[["K", "CFR (K/(K-1))"]]
     return df_out
@@ -152,7 +152,7 @@ def find_fc_sd(df: pd.DataFrame):
         pd.DataFrame: DataFrame with the standard deviation for each K.
     """
     df_out = df[["K", "fc"]].groupby("K", as_index=False).agg("std")
-    df_out = df_out.rename(columns={"fc": "fc_sd"})
+    df_out = df_out.rename(columns={"fc": "fc_sd"})  # type: ignore
     return df_out
 
 
