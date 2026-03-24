@@ -17,4 +17,4 @@
 USER_DIR=/u/$USER
 
 source $USER_DIR/venvs/.venv/bin/activate
-srun python $USER_DIR/de_lu_epf/src/hpo/tune_dmf/tune_xgbr.py
+srun python $USER_DIR/de_lu_epf/src/models/hpo/tune_dmf/tune_xgbr.py
