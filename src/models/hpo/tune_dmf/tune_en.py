@@ -10,9 +10,9 @@ from src.models.hpo.tune_dmf.utils import create_dmf_study
 
 if __name__ == "__main__":
     # Set paths
-    BASE_DIR = Path(__file__).parent.parent.parent.parent
+    BASE_DIR = Path(__file__).parent.parent.parent.parent.parent
     cfg_path = BASE_DIR / "configs/models/hpo_config.yaml"
-    studies_path = BASE_DIR / "studies"
+    studies_path = BASE_DIR / "studies/dmf/en"
 
     # Set configs
     name = "en"
@@ -28,7 +28,7 @@ if __name__ == "__main__":
 
     # Create DMF study
     study = create_dmf_study(
-        hour=hour, model_class=model_class, search_space=search_space, n_jobs=n_jobs
+        hour=hour, model_class=model_class, n_trials=1_000, search_space=search_space, n_jobs=n_jobs
     )
 
     # Save study

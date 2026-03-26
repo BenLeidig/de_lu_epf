@@ -9,9 +9,9 @@ from src.models.hpo.tune_vtlm.utils import tune_vmd_tcn_lstm_mha
 
 if __name__ == "__main__":
     # Set paths
-    BASE_DIR = Path(__file__).parent.parent.parent.parent
+    BASE_DIR = Path(__file__).parent.parent.parent.parent.parent
     cfg_path = BASE_DIR / "configs/models/hpo_config.yaml"
-    studies_path = BASE_DIR / "studies"
+    studies_path = BASE_DIR / "studies/hybrid/vtlm"
 
     # Set configs
     with open(cfg_path) as f:

@@ -8,12 +8,12 @@ import yaml
 from sklearn.metrics import mean_absolute_error
 
 
-def create_dmf_data(set: str, features: list, response: str):
+def create_dmf_data(set: str, features: list, target: str):
     BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent.parent
     data_path = BASE_DIR / "data/processed/dmf_data"
     df = pd.read_parquet(data_path / f"{set}_scaled.parquet")
     X = df[features]
-    y = df[response]
+    y = df[target]
     return X, y
 
 
@@ -40,10 +40,10 @@ def suggest_from_config(trial: optuna.trial.Trial, config: dict):
     params = {}
     for name, specs in config.items():
         if specs["type"] == "int":
-            params[name] = trial.suggest_int(name, specs["low"], specs["high"])
+            params[name] = trial.suggest_int(name, int(specs["low"]), int(specs["high"]))
         elif specs["type"] == "float":
             params[name] = trial.suggest_float(
-                name, specs["low"], specs["high"], log=specs.get("log", False)
+                name, float(specs["low"]), float(specs["high"]), log=specs.get("log", False)
             )
         elif specs["type"] == "categorical":
             params[name] = trial.suggest_categorical(name, specs["choices"])
@@ -76,10 +76,10 @@ def create_dmf_objective(hour: int, model_class, search_space: dict, n_jobs: int
         cfg = yaml.safe_load(f)["dmf"]
 
     features = cfg["features"]
-    response = cfg["responses"][hour]
+    target = cfg["targets"][hour]
 
-    X_train, y_train = create_dmf_data("train", features, response)
-    X_val, y_val = create_dmf_data("val", features, response)
+    X_train, y_train = create_dmf_data("train", features, target)
+    X_val, y_val = create_dmf_data("val", features, target)
 
     def objective(trial: optuna.trial.Trial):
         params = suggest_from_config(trial, search_space)

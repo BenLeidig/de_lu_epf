@@ -107,7 +107,7 @@ def tune_vmd_tcn_lstm_mha(
         #### training ####
         ## making the dataset considering the batch_size
         datamodule = ANNDataModule(
-            data_dir=Path(__file__).resolve().parent.parent.parent.parent
+            data_dir=Path(__file__).resolve().parent.parent.parent.parent.parent
             / "data/processed/vmd_data",
             batch_size=batch_size,
             target_col=target_col,
