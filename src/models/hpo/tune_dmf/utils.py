@@ -2,9 +2,11 @@ import gc
 from inspect import signature
 from pathlib import Path
 
+import numpy as np
 import optuna
 import pandas as pd
 import yaml
+from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import mean_absolute_error
 
 
@@ -65,6 +67,7 @@ def create_dmf_objective(hour: int, model_class, search_space: dict, n_jobs: int
         hour (int): Hour of day to forecast (should be in 0 - 24, inclusively).
         model_class: Model class to instantiate, provided it has `.fit()` and `.predict()` methods.
         search_space (dict): Configurations for the parameter search spaces.
+        n_jobs (int): The number of jobs to run in parallel.
 
     Returns:
         Callable[[optuna.trial.Trial], float]: Objective function for an Optuna study.
@@ -80,19 +83,31 @@ def create_dmf_objective(hour: int, model_class, search_space: dict, n_jobs: int
 
     X_train, y_train = create_dmf_data("train", features, target)
     X_val, y_val = create_dmf_data("val", features, target)
+    X_train_val = pd.concat([X_train, X_val], axis=0)
+    y_train_val = pd.concat([y_train, y_val], axis=0)
+    tscv = TimeSeriesSplit(n_splits=5, max_train_size=365*4, test_size=365//5)
 
     def objective(trial: optuna.trial.Trial):
         params = suggest_from_config(trial, search_space)
         if supports_parallel(model_class):
             params["n_jobs"] = n_jobs
 
-        mod = model_class(**params)
-        mod.fit(X_train, y_train)
-        y_val_pred = mod.predict(X_val)
+        val_scores = np.zeros(5)
+        for i, (train_idx, val_idx) in enumerate(tscv.split(X=X_train_val, y=y_train_val)):
+            X_train_cv, y_train_cv = X_train_val.iloc[train_idx, :], y_train_val.iloc[train_idx]
+            X_val_cv, y_val_cv = X_train_val.iloc[val_idx, :], y_train_val.iloc[val_idx]
 
+            mod = model_class(**params)
+            mod.fit(X_train_cv, y_train_cv)
+            y_val_cv_pred = mod.predict(X_val_cv)
+
+            score = mean_absolute_error(y_val_cv, y_val_cv_pred)
+            val_scores[i] = score
+        mean_val_score = np.mean(val_scores)
+        
         gc.collect()
 
-        return mean_absolute_error(y_val, y_val_pred)
+        return mean_val_score
 
     return objective
 
@@ -101,8 +116,8 @@ def create_dmf_study(
     hour: int,
     model_class,
     search_space: dict,
+    n_trials = "auto",
     multivariate: bool = True,
-    n_trials: int = 100,
     n_jobs: int = 1,
     random_state: int = 0,
 ):
@@ -118,13 +133,15 @@ def create_dmf_study(
         hour (int):  Hour of day to forecast (should be in 0 - 24, inclusively).
         model_class: Model class to instantiate, provided it has `.fit()` and `.predict()` methods.
         search_space (dict): Configurations for the parameter search spaces.
+        n_trials (any, optional): The number of trials for each process. `auto` determines the number of trials to be 50*len(search_space.keys()), or fifty times the dimension of the parameter space. The study continues to create trials until the number of trials reaches `n_trials`, `timeout` period elapses, `stop()` is called, or a termination signal such as SIGTERM or Ctrl+C is received. Defaults to "auto".
         multivariate (bool, optional): If this is `True`, the multivariate TPE is used when suggesting parameters. The multivariate TPE is reported to outperform the independent TPE. Defaults to True.
-        n_trials (int, optional): The number of trials for each process. `None` represents no limit in terms of the number of trials. The study continues to create trials until the number of trials reaches `n_trials`, `timeout` period elapses, `stop()` is called, or a termination signal such as SIGTERM or Ctrl+C is received.. Defaults to 100.
+        n_jobs (int, optional): The number of jobs to run in parallel. Defaults to 1.
         random_state (int, optional): Seed for random number generator. Defaults to 0.
 
     Returns:
         optuna.study.Study: Optuna study after completed optimization.
     """
+    n_trials = 50 * len(search_space.keys()) if n_trials == "auto" else n_trials
     objective = create_dmf_objective(hour, model_class, search_space, n_jobs)
     sampler = optuna.samplers.TPESampler(multivariate=multivariate, seed=random_state)
     study = optuna.create_study(direction="minimize", sampler=sampler)
