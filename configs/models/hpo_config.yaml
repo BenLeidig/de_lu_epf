@@ -24,7 +24,6 @@ vmd-tcn-lstm-mha:
   n_trials: 1000
   accelerator: gpu
   random_state: 0
-  ranges:
 
 # ElasticNet
 en:
