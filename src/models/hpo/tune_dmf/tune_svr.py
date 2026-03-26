@@ -28,7 +28,7 @@ if __name__ == "__main__":
 
     # Create DMF study
     study = create_dmf_study(
-        hour=hour, model_class=model_class, n_trials=1_000, search_space=search_space, n_jobs=n_jobs
+        hour=hour, model_class=model_class, search_space=search_space, n_jobs=n_jobs
     )
 
     # Save study
