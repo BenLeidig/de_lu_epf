@@ -15,7 +15,7 @@ vmd-tcn-lstm-mha:
   lr_init_range: [1e-4, 1e-1]
   kernel_size_range: [2, 8]
   tcn_dropout_range: [0.0, 0.5]
-  lstm_droupouts_range: [0.0, 0.5]
+  lstm_dropouts_range: [0.0, 0.5]
   mha_dropout_range: [0.0, 0.5]
   mha_heads_range: [1, 2, 4, 8, 16]
   patience: 5
@@ -24,7 +24,6 @@ vmd-tcn-lstm-mha:
   n_trials: 1000
   accelerator: gpu
   random_state: 0
-  ranges:
 
 # ElasticNet
 en:
@@ -57,7 +56,7 @@ svr:
     low: 1e-2
     high: 1e3
     log: True
-  epislon:
+  epsilon:
     type: "float"
     low: 1e-4
     high: 1.0
@@ -130,11 +129,11 @@ rfr:
     high: 5
   max_features:
     type: "categorical"
-    choices: ["auto", "sqrt", "log2"]
+    choices: [null, "sqrt", "log2"]
   bootstrap:
     type: "constant"
     value: True
-    random_state:
+  random_state:
     type: "constant"
     value: 0
 

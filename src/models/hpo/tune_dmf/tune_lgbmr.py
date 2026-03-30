@@ -10,9 +10,9 @@ from src.models.hpo.tune_dmf.utils import create_dmf_study
 
 if __name__ == "__main__":
     # Set paths
-    BASE_DIR = Path(__file__).parent.parent.parent.parent
+    BASE_DIR = Path(__file__).parent.parent.parent.parent.parent
     cfg_path = BASE_DIR / "configs/models/hpo_config.yaml"
-    studies_path = BASE_DIR / "studies"
+    studies_path = BASE_DIR / "studies/dmf/lgbmr"
 
     # Set configs
     name = "lgbmr"

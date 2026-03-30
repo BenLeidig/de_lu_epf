@@ -35,16 +35,16 @@ def tune_vmd_tcn_lstm_mha(
 
         #### general params ####
         batch_size = trial.suggest_int(
-            "batch_size", batch_size_range[0], batch_size_range[1], log=True
+            "batch_size", int(batch_size_range[0]), int(batch_size_range[1]), log=True
         )
         lr_init = trial.suggest_float(
-            "lr_init", lr_init_range[0], lr_init_range[1], log=True
+            "lr_init", float(lr_init_range[0]), float(lr_init_range[1]), log=True
         )
 
         #### TCN params ####
         dilation_base = 2
         kernel_size = trial.suggest_int(
-            "kernel_size", kernel_size_range[0], kernel_size_range[1]
+            "kernel_size", int(kernel_size_range[0]), int(kernel_size_range[1])
         )
         num_blocks = int(
             np.ceil(
@@ -63,7 +63,7 @@ def tune_vmd_tcn_lstm_mha(
             )
 
         tcn_dropout = trial.suggest_float(
-            "tcn_dropout", tcn_dropout_range[0], tcn_dropout_range[1]
+            "tcn_dropout", float(tcn_dropout_range[0]), float(tcn_dropout_range[1])
         )
 
         #### LSTM params ####
@@ -79,18 +79,18 @@ def tune_vmd_tcn_lstm_mha(
         hidden_sizes = [hidden_size0, hidden_size1, hidden_size2]
 
         lstm_dropout0 = trial.suggest_float(
-            "lstm_dropout0", lstm_dropouts_range[0], lstm_dropouts_range[1]
+            "lstm_dropout0", float(lstm_dropouts_range[0]), float(lstm_dropouts_range[1])
         )
         lstm_dropout1 = trial.suggest_float(
-            "lstm_dropout1", lstm_dropouts_range[0], lstm_dropouts_range[1]
+            "lstm_dropout1", float(lstm_dropouts_range[0]), float(lstm_dropouts_range[1])
         )
         lstm_dropouts = [lstm_dropout0, lstm_dropout1]
 
         #### MHA params ####
         mha_dropout = trial.suggest_float(
-            "mha_dropout", mha_dropout_range[0], mha_dropout_range[1]
+            "mha_dropout", float(mha_dropout_range[0]), float(mha_dropout_range[1])
         )
-        mha_heads = trial.suggest_categorical("mha_heads", mha_heads_range)
+        mha_heads = trial.suggest_categorical("mha_heads", [int(h) for h in mha_heads_range])
         if hidden_sizes[-1] % mha_heads != 0:  # type: ignore
             raise optuna.TrialPruned()
 
@@ -107,7 +107,7 @@ def tune_vmd_tcn_lstm_mha(
         #### training ####
         ## making the dataset considering the batch_size
         datamodule = ANNDataModule(
-            data_dir=Path(__file__).resolve().parent.parent.parent.parent
+            data_dir=Path(__file__).resolve().parent.parent.parent.parent.parent
             / "data/processed/vmd_data",
             batch_size=batch_size,
             target_col=target_col,

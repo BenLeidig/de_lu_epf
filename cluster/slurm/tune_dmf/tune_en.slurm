@@ -17,4 +17,5 @@
 USER_DIR=/u/$USER
 
 source $USER_DIR/venvs/.venv/bin/activate
+export PYTHONPATH=$USER_DIR/de_lu_epf
 srun python $USER_DIR/de_lu_epf/src/models/hpo/tune_dmf/tune_en.py
