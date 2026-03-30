@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import pandas as pd
-import yaml
+from sklearn.preprocessing import StandardScaler
 
 
 def get_splits(df: pd.DataFrame, split_list: list):
@@ -41,34 +41,21 @@ def save_splits(df: pd.DataFrame, split_list: list, path: Path):
     train_val.to_parquet(path / "train_val.parquet", index=True)
 
 
-if __name__ == "__main__":
-    print("+" * 8, " `split_data.py` started. ", "+" * 8)
+def get_scaled(df_train: pd.DataFrame, df_test: pd.DataFrame):
+    """Scale the provided train and test datasets.
 
-    # Set paths
-    BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
-    cfg_path = BASE_DIR / "configs"
-    data_path = BASE_DIR / "data"
+    Args:
+        df_train (pd.DataFrame): Train data to fit and transform.
+        df_test (pd.DataFrame): Test data to transform.
 
-    # Set configs
-    with open(cfg_path / "data/process_config.yaml") as f:
-        cfg = yaml.safe_load(f)["dt_range"]
-
-    # Load data
-    df = pd.read_parquet(data_path / "processed/processed.parquet")
-    df_dmf = pd.read_parquet(data_path / "processed/dmf_data/processed.parquet")
-
-    # Get split list (list of dates for each split)
-    split_names = ["train", "val", "test"]
-    split_list = []
-    for k in split_names:
-        split_list.append((cfg[k]["start"], cfg[k]["end"]))
-
-    #### #### ANN-specific data splits #### ####
-    save_splits(df, split_list, path=data_path / "processed/ann_data")
-    print("-" * 8, "Saved ANN splits.", "-" * 8)
-
-    #### #### DMF-specific data splits #### ####
-    save_splits(df_dmf, split_list, path=data_path / "processed/dmf_data")
-    print("-" * 8, "Saved DMF splits.", "-" * 8)
-
-    print("+" * 8, " `split_data.py` completed. ", "+" * 8)
+    Returns:
+        tuple: Tuple of (fitted scaler, scaled train data, scaled test data).
+    """
+    scaler = StandardScaler()
+    df_train_scaled = pd.DataFrame(
+        scaler.fit_transform(df_train), columns=df_train.columns, index=df_train.index
+    )
+    df_test_scaled = pd.DataFrame(
+        scaler.transform(df_test), columns=df_test.columns, index=df_test.index
+    )
+    return scaler, df_train_scaled, df_test_scaled

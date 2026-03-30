@@ -6,7 +6,7 @@ import yaml
 from joblib import dump
 from sklearn.linear_model import ElasticNet
 
-from src.models.hpo.tune_dmf.utils import create_dmf_study
+from models.hpo.tune_dmf import create_dmf_study
 
 if __name__ == "__main__":
     # Set paths

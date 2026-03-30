@@ -5,7 +5,7 @@ import torch
 import yaml
 from joblib import dump
 
-from src.models.hpo.tune_vtlm.utils import tune_vmd_tcn_lstm_mha
+from models.hpo.tune_hybrid import tune_vmd_tcn_lstm_mha
 
 if __name__ == "__main__":
     # Set paths

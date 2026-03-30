@@ -3,9 +3,10 @@ from pathlib import Path
 import lightning.pytorch as pl
 import numpy as np
 import pandas as pd
+import torch
 
 from src.data.datamodule import ANNDataModule
-from src.models.components.tcn_lstm_mha import TCN_LSTM_MHA
+from models.architectures import TCN_LSTM_MHA
 
 
 def get_vtlm_params(best_params: dict):
@@ -28,7 +29,7 @@ def get_vtlm_params(best_params: dict):
     return batch_size, params
 
 
-def get_ann_fitted(
+def ann_fit_predict(
     target_col: str,
     batch_size: int,
     params: dict,
@@ -63,6 +64,7 @@ def get_ann_fitted(
     )
 
     trainer.fit(model, train_dataloaders=train_val_dataloader)
-    trainer.predict(model, dataloaders=test_dataloader)
+    y_test_pred = trainer.predict(model, dataloaders=test_dataloader)
+    y_test_pred = torch.cat(y_test_pred, dim=0)  # type: ignore
 
-    return batch_size, model, trainer
+    return model, y_test_pred

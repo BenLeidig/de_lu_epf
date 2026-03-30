@@ -4,23 +4,23 @@ from pathlib import Path
 
 import yaml
 from joblib import dump
-from xgboost import XGBRegressor
+from sklearn.svm import SVR
 
-from src.models.hpo.tune_dmf.utils import create_dmf_study
+from models.hpo.tune_dmf import create_dmf_study
 
 if __name__ == "__main__":
     # Set paths
     BASE_DIR = Path(__file__).parent.parent.parent.parent.parent
     cfg_path = BASE_DIR / "configs/models/hpo_config.yaml"
-    studies_path = BASE_DIR / "studies/dmf/xgbr"
+    studies_path = BASE_DIR / "studies/dmf/svr"
 
     # Set configs
-    name = "xgbr"
+    name = "svr"
     with open(cfg_path) as f:
         search_space = yaml.safe_load(f)[name]
 
     # Set model class
-    model_class = XGBRegressor
+    model_class = SVR
 
     # Get forecasting hour and get multithreading capacity
     hour = int(os.environ["SLURM_ARRAY_TASK_ID"])

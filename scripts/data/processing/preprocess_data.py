@@ -3,28 +3,8 @@ from pathlib import Path
 import pandas as pd
 import yaml
 from joblib import dump
-from sklearn.preprocessing import StandardScaler
 
-
-def get_scaled(df_train: pd.DataFrame, df_test: pd.DataFrame):
-    """Scale the provided train and test datasets.
-
-    Args:
-        df_train (pd.DataFrame): Train data to fit and transform.
-        df_test (pd.DataFrame): Test data to transform.
-
-    Returns:
-        tuple: Tuple of (fitted scaler, scaled train data, scaled test data).
-    """
-    scaler = StandardScaler()
-    df_train_scaled = pd.DataFrame(
-        scaler.fit_transform(df_train), columns=df_train.columns, index=df_train.index
-    )
-    df_test_scaled = pd.DataFrame(
-        scaler.transform(df_test), columns=df_test.columns, index=df_test.index
-    )
-    return scaler, df_train_scaled, df_test_scaled
-
+from data.processing import get_scaled
 
 if __name__ == "__main__":
     print("+" * 8, " `scale.py` started. ", "+" * 8)

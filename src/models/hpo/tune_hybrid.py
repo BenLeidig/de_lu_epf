@@ -7,7 +7,7 @@ import optuna
 import torch
 
 from src.data.datamodule import ANNDataModule
-from src.models.components.tcn_lstm_mha import TCN_LSTM_MHA
+from models.architectures import TCN_LSTM_MHA
 
 
 def tune_vmd_tcn_lstm_mha(

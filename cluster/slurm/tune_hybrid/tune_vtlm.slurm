@@ -18,4 +18,4 @@ USER_DIR=/u/$USER
 
 source $USER_DIR/venvs/.venv/bin/activate
 export PYTHONPATH=$USER_DIR/de_lu_epf
-srun python $USER_DIR/de_lu_epf/src/models/hpo/tune_vtlm/tune_vtlm.py
+srun python $USER_DIR/de_lu_epf/scripts/models/hpo/hybrid/tune_vtlm.py
