@@ -6,7 +6,7 @@ import yaml
 from joblib import dump
 from sklearn.svm import SVR
 
-from models.hpo.tune_dmf import create_dmf_study
+from models.hpo.dmf_tuning import create_dmf_study
 
 if __name__ == "__main__":
     # Set paths

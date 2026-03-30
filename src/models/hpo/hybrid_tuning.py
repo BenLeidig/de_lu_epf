@@ -6,7 +6,7 @@ import numpy as np
 import optuna
 import torch
 
-from src.data.datamodule import ANNDataModule
+from src.data.loading import ANNDataModule
 from models.architectures import TCN_LSTM_MHA
 
 
