@@ -61,7 +61,7 @@ class TCN_LSTM_MHA(pl.LightningModule):
         self.norm = nn.LayerNorm(hidden_sizes[-1])
 
         # head
-        self.fc = nn.Linear(hidden_sizes[-1], 1)
+        self.fc = nn.Linear(hidden_sizes[-1], 24)
 
     def forward(self, x):
         # TCN
@@ -84,20 +84,22 @@ class TCN_LSTM_MHA(pl.LightningModule):
         x = self.norm(x + mha_out)
 
         # head
-        return self.fc(x[:, -24:, :]).squeeze(-1)
+        return self.fc(x[:, -1, :])
 
     def training_step(self, batch, batch_idx):
         x, y = batch
         y_hat = self(x)
         loss = self.criterion(y_hat, y)
-        self.log("train_loss", loss, on_step=False, on_epoch=True)
+        self.log("train_loss", loss, on_step=False, on_epoch=True, batch_size=x.size(0))
         return loss
 
     def validation_step(self, batch, batch_idx):
         x, y = batch
         y_hat = self(x)
         val_loss = self.criterion(y_hat, y)
-        self.log("val_loss", val_loss, on_step=False, on_epoch=True)
+        self.log(
+            "val_loss", val_loss, on_step=False, on_epoch=True, batch_size=x.size(0)
+        )
         return val_loss
 
     def predict_step(self, batch, batch_idx):

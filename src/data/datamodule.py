@@ -2,6 +2,7 @@ from pathlib import Path
 
 import lightning.pytorch as pl
 import pandas as pd
+from lightning.pytorch.utilities.types import EVAL_DATALOADERS
 from torch.utils.data import DataLoader
 
 from src.data.dataset import ANNDataset
@@ -65,7 +66,22 @@ class ANNDataModule(pl.LightningDataModule):
                 self.X_val, self.y_val, self.seq_len, self.pred_len, self.stride
             )
 
-        if stage in (None, "test"):  ## Test dataset:
+        if stage in (None, "test"):
+            ## Training + validation dataset:
+            np_train_val = pd.read_parquet(
+                self.data_dir / "train_val_scaled.parquet"
+            ).to_numpy()
+            self.X_train_val = np_train_val
+            self.y_train_val = np_train_val[:, self.target_idx]
+            self.train_val_dataset = ANNDataset(
+                self.X_train_val,
+                self.y_train_val,
+                self.seq_len,
+                self.pred_len,
+                self.stride,
+            )
+
+            ## Testing dataset:
             np_test = pd.read_parquet(self.data_dir / "test_scaled.parquet").to_numpy()
             self.X_test = np_test
             self.y_test = np_test[:, self.target_idx]
@@ -85,6 +101,24 @@ class ANNDataModule(pl.LightningDataModule):
     def val_dataloader(self):
         return DataLoader(
             self.val_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,  # Real-time constraint
+            num_workers=2,
+            persistent_workers=False,  # False for HPC cluster
+        )
+
+    def train_val_dataloader(self):
+        return DataLoader(
+            self.train_val_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,  # Real-time constraint
+            num_workers=2,
+            persistent_workers=False,  # False for HPC cluster
+        )
+
+    def test_dataloader(self):
+        return DataLoader(
+            self.test_dataset,
             batch_size=self.batch_size,
             shuffle=False,  # Real-time constraint
             num_workers=2,
