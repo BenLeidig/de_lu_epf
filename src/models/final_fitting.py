@@ -1,15 +1,21 @@
 from pathlib import Path
 
 import lightning.pytorch as pl
-import numpy as np
-import pandas as pd
 import torch
+from joblib import load
 
-from src.data.datamodule import ANNDataModule
-from models.architectures import TCN_LSTM_MHA
+from src.data.loading import ANNDataModule
 
 
-def get_vtlm_params(best_params: dict):
+def get_best_params(study_path: Path):
+    study = load(study_path)
+    return study.best_params
+
+
+
+
+
+def get_best_vtlm_params(best_params: dict):
     batch_size = best_params.pop("batch_size")
     hidden_sizes = [
         best_params.pop("hidden_size0"),

@@ -11,7 +11,7 @@ if __name__ == "__main__":
 
     # Set paths
     BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
-    cfg_path = BASE_DIR / "configs/model/hyperparams_config.yaml"
+    cfg_path = BASE_DIR / "configs/model/vmd_hyperparams_config.yaml"
     data_path = BASE_DIR / "data/processed"
     model_path = BASE_DIR / "models"
 

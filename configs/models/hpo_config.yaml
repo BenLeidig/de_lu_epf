@@ -42,9 +42,6 @@ en:
   selection:
     type: "constant"
     value: "random"
-  random_state:
-    type: "constant"
-    value: 0
 
 # SVR
 svr:
@@ -105,9 +102,6 @@ xgbr:
   booster:
     type: "categorical"
     choices: ["gbtree", "dart"]
-  random_state:
-    type: "constant"
-    value: 0
 
 # RandomForestRegressor
 rfr:
@@ -133,9 +127,6 @@ rfr:
   bootstrap:
     type: "constant"
     value: True
-  random_state:
-    type: "constant"
-    value: 0
 
 # LGBMRegressor
 lgbmr:
@@ -179,6 +170,3 @@ lgbmr:
   boosting_type:
     type: "categorical"
     choices: ["gbdt", "dart"]
-  random_state:
-    type: "constant"
-    value: 0

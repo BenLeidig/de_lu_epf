@@ -6,8 +6,8 @@ import numpy as np
 import optuna
 import pandas as pd
 import yaml
-from sklearn.model_selection import TimeSeriesSplit
 from sklearn.metrics import mean_absolute_error
+from sklearn.model_selection import TimeSeriesSplit
 
 
 def create_dmf_data(set: str, features: list, target: str):
@@ -17,6 +17,10 @@ def create_dmf_data(set: str, features: list, target: str):
     X = df[features]
     y = df[target]
     return X, y
+
+
+def supports_random_state(model_class):
+    return "random_state" in signature(model_class).parameters
 
 
 def supports_parallel(model_class):
@@ -42,10 +46,15 @@ def suggest_from_config(trial: optuna.trial.Trial, config: dict):
     params = {}
     for name, specs in config.items():
         if specs["type"] == "int":
-            params[name] = trial.suggest_int(name, int(specs["low"]), int(specs["high"]))
+            params[name] = trial.suggest_int(
+                name, int(specs["low"]), int(specs["high"])
+            )
         elif specs["type"] == "float":
             params[name] = trial.suggest_float(
-                name, float(specs["low"]), float(specs["high"]), log=specs.get("log", False)
+                name,
+                float(specs["low"]),
+                float(specs["high"]),
+                log=specs.get("log", False),
             )
         elif specs["type"] == "categorical":
             params[name] = trial.suggest_categorical(name, specs["choices"])
@@ -85,16 +94,23 @@ def create_dmf_objective(hour: int, model_class, search_space: dict, n_jobs: int
     X_val, y_val = create_dmf_data("val", features, target)
     X_train_val = pd.concat([X_train, X_val], axis=0)
     y_train_val = pd.concat([y_train, y_val], axis=0)
-    tscv = TimeSeriesSplit(n_splits=5, max_train_size=365*4, test_size=365//5)
+    tscv = TimeSeriesSplit(n_splits=5, max_train_size=365 * 4, test_size=365 // 5)
 
     def objective(trial: optuna.trial.Trial):
         params = suggest_from_config(trial, search_space)
+        if supports_random_state(model_class):
+            params["random_state"] = 0
         if supports_parallel(model_class):
             params["n_jobs"] = n_jobs
 
         val_scores = np.zeros(5)
-        for i, (train_idx, val_idx) in enumerate(tscv.split(X=X_train_val, y=y_train_val)):
-            X_train_cv, y_train_cv = X_train_val.iloc[train_idx, :], y_train_val.iloc[train_idx]
+        for i, (train_idx, val_idx) in enumerate(
+            tscv.split(X=X_train_val, y=y_train_val)  # type: ignore
+        ):
+            X_train_cv, y_train_cv = (
+                X_train_val.iloc[train_idx, :],
+                y_train_val.iloc[train_idx],
+            )
             X_val_cv, y_val_cv = X_train_val.iloc[val_idx, :], y_train_val.iloc[val_idx]
 
             mod = model_class(**params)
@@ -104,7 +120,7 @@ def create_dmf_objective(hour: int, model_class, search_space: dict, n_jobs: int
             score = mean_absolute_error(y_val_cv, y_val_cv_pred)
             val_scores[i] = score
         mean_val_score = np.mean(val_scores)
-        
+
         gc.collect()
 
         return mean_val_score
@@ -116,7 +132,7 @@ def create_dmf_study(
     hour: int,
     model_class,
     search_space: dict,
-    n_trials = "auto",
+    n_trials="auto",
     multivariate: bool = True,
     n_jobs: int = 1,
     random_state: int = 0,
@@ -145,5 +161,5 @@ def create_dmf_study(
     objective = create_dmf_objective(hour, model_class, search_space, n_jobs)
     sampler = optuna.samplers.TPESampler(multivariate=multivariate, seed=random_state)
     study = optuna.create_study(direction="minimize", sampler=sampler)
-    study.optimize(objective, n_trials=n_trials)
+    study.optimize(objective, n_trials=n_trials)  # type: ignore
     return study

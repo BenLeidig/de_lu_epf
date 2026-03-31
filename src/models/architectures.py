@@ -1,9 +1,63 @@
 import lightning.pytorch as pl
+import numpy as np
+import pandas as pd
 import torch
 import torch.nn as nn
 from pytorch_tcn import TCN
+from sklearn.base import BaseEstimator, RegressorMixin
+from sklearn.utils.validation import check_is_fitted
 
 torch.set_float32_matmul_precision("high")
+
+
+class DirectMultiStepForecaster(RegressorMixin, BaseEstimator):
+    """Custom Direct Multi-Step Forecaster (DMF) wrapper class. Creates 24 models of the provided `model_class` class, each to forecast a specific hour of the next day.
+    Args:
+    params (dict): Dictionary of parameters with integer keys of 0 through 23 and dictionary values of `model_class` class parameters.
+    model_class (_type_): Model class to use for all hours' models. Must have `.fit()` and `.predict()` methods.
+    """
+
+    def __init__(self, params: dict, model_class):
+        self.params = params
+        self.model_class = model_class
+
+    def fit(self, X, Y):
+        # n0 = X.shape[0] = Y.shape[0]
+        # p = X.shape[1]
+        # q = Y.shape[1] = len(self.params)
+        # --------
+        # X.shape = (n0, p)
+        # Y.shape = (n0, q)
+        # y_i.shape = (n0, )
+
+        self.target_names_ = getattr(Y, "columns", None)
+        X, Y = self._validate_data(X, Y, multi_output=True)  # type: ignore
+        self.models_ = {}
+
+        if len(self.params) != Y.shape[1]:
+            raise ValueError("Number of parameter sets must match number of targets")
+
+        for hour in range(Y.shape[1]):
+            model = self.model_class(**self.params[hour])
+            model.fit(X, Y[:, hour])
+            self.models_[hour] = model
+
+        return self
+
+    def predict(self, X):
+        # n = X.shape[0]
+        # preds.shape = (n, q)
+
+        check_is_fitted(self, "models_")
+        X = self._validate_data(X, reset=False)  # type: ignore
+
+        preds = [self.models_[hour].predict(X) for hour in sorted(self.models_)]
+        preds = np.column_stack(preds)
+
+        if self.target_names_ is not None:
+            return pd.DataFrame(preds, columns=self.target_names_)
+
+        return preds
 
 
 class TCN_LSTM_MHA(pl.LightningModule):
