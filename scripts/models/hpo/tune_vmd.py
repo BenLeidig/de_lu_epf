@@ -6,7 +6,7 @@ import pandas as pd
 import seaborn as sns
 import yaml
 
-from src.models.hpo.vmd_tuning import (
+from de_lu_epf.models.hpo.vmd_tuning import (
     find_cfr_K,
     find_cfr_min_max,
     find_cfr_roc,

@@ -3,7 +3,7 @@ from pathlib import Path
 import pandas as pd
 import yaml
 
-from data.processing import save_splits
+from de_lu_epf.data.processing import save_splits
 
 if __name__ == "__main__":
     print("+" * 8, " `split_data.py` started. ", "+" * 8)

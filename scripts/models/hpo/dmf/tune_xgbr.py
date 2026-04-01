@@ -6,7 +6,7 @@ import yaml
 from joblib import dump
 from xgboost import XGBRegressor
 
-from models.hpo.dmf_tuning import create_dmf_study
+from de_lu_epf.models.hpo.dmf_tuning import create_dmf_study
 
 if __name__ == "__main__":
     # Set paths

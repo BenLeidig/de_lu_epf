@@ -4,7 +4,7 @@ import pandas as pd
 import yaml
 from joblib import dump
 
-from data.processing import get_scaled
+from de_lu_epf.data.processing import get_scaled
 
 if __name__ == "__main__":
     print("+" * 8, " `scale.py` started. ", "+" * 8)

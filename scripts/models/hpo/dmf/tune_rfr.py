@@ -6,7 +6,7 @@ import yaml
 from joblib import dump
 from sklearn.ensemble import RandomForestRegressor
 
-from models.hpo.dmf_tuning import create_dmf_study
+from de_lu_epf.models.hpo.dmf_tuning import create_dmf_study
 
 if __name__ == "__main__":
     # Set paths
