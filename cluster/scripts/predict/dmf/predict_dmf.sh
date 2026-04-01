@@ -5,5 +5,5 @@ model_class=("lr" "en" "lgbmr" "rfr" "svr" "xgbr")
 
 # Submit job for each model class
 for mod in "${model_class[@]}"; do
-    sbatch "cluster/slurm/train/dmf/train_${mod}.slurm"
+    sbatch "cluster/slurm/predict/dmf/predict_${mod}.slurm"
 done
