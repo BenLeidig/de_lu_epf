@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 from joblib import load
 from yaml import safe_load
@@ -43,8 +44,11 @@ def fetch_full_scaler(model_type: str):
     return load(MODEL_DIR / "scaler.pkl")
 
 
-def format_dmf_preds(preds):
-    return preds.to_numpy().flatten()
+def format_preds(preds, which: str):
+    if which == "dmf":
+        return np.asarray(preds).flatten()
+    elif which == "hybrid":
+        return np.asarray(preds).sum(axis=1)
 
 
 def get_predictions_dmf(model_name: str):
@@ -76,10 +80,54 @@ def get_predictions_dmf(model_name: str):
     )
 
     y_train_val_pred = pd.DataFrame(
-        data=format_dmf_preds(Y_train_val_pred), columns=["price"], index=train_val_idx
+        data=format_preds(preds=Y_train_val_pred, which="dmf"),
+        columns=["price"],
+        index=train_val_idx,
     )
     y_test_pred = pd.DataFrame(
-        data=format_dmf_preds(Y_test_pred), columns=["price"], index=test_idx
+        data=format_preds(preds=Y_test_pred, which="dmf"),
+        columns=["price"],
+        index=test_idx,
+    )
+
+    return y_train_val_pred, y_test_pred
+
+
+def get_predictions_hybrid(model_name: str):
+    model_type = "hybrid"
+
+    df_train_val_scaled, _ = fetch_train_val_data(model_type)
+    df_test_scaled, _ = fetch_test_data(model_type)
+
+    features, targets = fetch_features_targets(model_type)
+    X_train_val_scaled = df_train_val_scaled[features]
+    X_test_scaled = df_test_scaled[features]
+
+    hybrid = fetch_fitted(model_type=model_type, model_name=model_name)
+    scaler = fetch_full_scaler(model_type)
+
+    Y_train_val_scaled_pred = hybrid.predict(X_train_val_scaled)
+    Y_test_scaled_pred = hybrid.predict(X_test_scaled)
+
+    train_val_idx = X_train_val_scaled.index
+    test_idx = X_test_scaled.index
+
+    Y_train_val_pred = scaler.inverse_transform(
+        pd.concat([X_train_val_scaled, Y_train_val_scaled_pred], axis=1)
+    )[targets]
+    Y_test_pred = scaler.inverse_transform(
+        pd.concat([X_test_scaled, Y_test_scaled_pred], axis=1)
+    )[targets]
+
+    y_train_val_pred = pd.DataFrame(
+        data=format_preds(preds=Y_train_val_pred, which="hybrid"),
+        columns=["price"],
+        index=train_val_idx,
+    )
+    y_test_pred = pd.DataFrame(
+        data=format_preds(preds=Y_test_pred, which="hybrid"),
+        columns=["price"],
+        index=test_idx,
     )
 
     return y_train_val_pred, y_test_pred

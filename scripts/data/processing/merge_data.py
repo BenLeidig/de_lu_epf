@@ -5,82 +5,12 @@ from pathlib import Path
 import pandas as pd
 import yaml
 
-
-def add_dt_col(j: dict, dt_col: str, dt_params: dict, dt_delta: int, empty: bool):
-    """Creates a DataFrame with a datetime column the provided datatime data.
-
-    Args:
-        j (dict): Dictionary data.
-        dt_col (str): Key for the values containing datetime information.
-        dt_params (dict): Parameters for the pd.DatetimeIndex conversion.
-        dt_delta (int): Time offset in hours (i.e. alignment is necessary).
-        empty (bool): Whether or not to return an empty DataFrame (besides for the datetime column).
-
-    Returns:
-        pd.DataFrame: DataFrame with a singular column of datetime data from the converted datetime column.
-    """
-    df = pd.DataFrame() if empty else pd.DataFrame(j)
-    df["datetime"] = pd.to_datetime(
-        j[dt_col] if empty else df[dt_col], **dt_params
-    ) + pd.Timedelta(hours=dt_delta)
-    return df
-
-
-def normalize_external(j: dict, df: pd.DataFrame, nest_key: str):
-    """Normalize the nested dictionary structure and return it as a DataFrame.
-
-    Args:
-        j (dict): Dictionary data.
-        df (pd.DataFrame): Empty DataFrame.
-        nest_key (str): Specified key for the 'nests' of the nested structure.
-
-    Returns:
-        pd.DataFrame: Dataframe of normalized structure.
-    """
-    for col_data in j[nest_key]:
-        col = col_data["name"].lower().replace(" ", "_").replace("-", "_")
-        df[col] = col_data["data"]
-    return df
-
-
-def make_hr_freq(df: pd.DataFrame):
-    """Select only hourly interval data of the DataFrame.
-
-    Args:
-        df (pd.DataFrame): DataFrame to modify (not in-place).
-
-    Returns:
-        pd.DataFrame: Modified DataFrame of hourly intervals.
-    """
-    return df[df["datetime"].dt.minute == 0]
-
-
-def reframe_df(df: pd.DataFrame, start: str, end: str):
-    """Reframe the specified DataFrame.
-
-    Args:
-        df (pd.DataFrame): DataFrame to be reframed (not in-place).
-        start (str): (Inclusive) Datetime-like string for the first datetime.
-        end (str): (Inclusive) Datetime-lik string for the last datetime.
-
-    Returns:
-        pd.DataFrame: Reframed DataFrame
-    """
-    return df[(df["datetime"] >= start) & (df["datetime"] <= end)]
-
-
-def subset_df(df: pd.DataFrame, subset: list):
-    """Return a subset of the provided DataFrame.
-
-    Args:
-        df (pd.DataFrame): DataFrame to subset.
-        subset (list): List of columns for the subset.
-
-    Returns:
-        pd.DataFrame: Subsetted DataFrame.
-    """
-    return df[subset]
-
+from de_lu_epf.data.processing import (
+    add_dt_col,
+    make_hr_freq,
+    normalize_external,
+    subset_df,
+)
 
 if __name__ == "__main__":
     print("+" * 8, " `merge_data.py` started. ", "+" * 8)

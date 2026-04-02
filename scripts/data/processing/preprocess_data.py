@@ -19,7 +19,7 @@ if __name__ == "__main__":
         preprocess_cfg = yaml.safe_load(f)
 
     # For each dataset --> loop
-    for set in ["ann", "dmf", "vmd"]:
+    for set in ["ann", "dmf", "hybrid"]:
         ## For each train set, test set, and partial / full folder --> loop
         for train, test, folder in zip(
             ["train", "train_val"], ["val", "test"], ["partial", "full"]
