@@ -7,6 +7,7 @@ from de_lu_epf.plots.predictions import (
     plot_predictions,
     plot_residuals,
     plot_residuals_barplot,
+    plot_residuals_raincloud,
     plot_residuals_violinplot,
 )
 from de_lu_epf.plots.utils import update_matplotlib_params
@@ -134,3 +135,19 @@ if __name__ == "__main__":
             suptitle=f"{metric_name} Barplot for Test Set Predictions",
         )
         fig.savefig(FIGS_DIR / f"predictions/test_{metric.__name__}.svg")
+
+    # RAINCLOUDPLOT TRAIN_VAL RESIDUALS
+    fig, _ = plot_residuals_raincloud(
+        actual_series=train_val_actual,
+        pred_series_dict=train_val_preds,
+        suptitle="Distribution of Train and Validation Set Predictions",
+    )
+    fig.savefig(FIGS_DIR / "predictions/train_val_residuals_raincloudplot.svg")
+
+    # RAINCLOUDPLOT TEST RESIDUALS
+    fig, _ = plot_residuals_raincloud(
+        actual_series=test_actual,
+        pred_series_dict=test_preds,
+        suptitle="Distribution of Test Set Predictions",
+    )
+    fig.savefig(FIGS_DIR / "predictions/test_residuals_raincloudplot.svg")

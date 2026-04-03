@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
-from de_lu_epf.plots.utils import plot_series
+from de_lu_epf.plots.utils import plot_series, raincloudplot
 
 
 def plot_predictions(
@@ -146,4 +146,37 @@ def plot_residuals_barplot(
         fig.suptitle(suptitle)
     fig.tight_layout()
 
+    return fig, ax
+
+
+def plot_residuals_raincloud(
+    actual_series,
+    pred_series_dict: dict,
+    suptitle: str = None,  # type: ignore
+):
+    df = pd.concat(
+        [
+            pd.DataFrame(
+                {
+                    "model": model_name,
+                    "residuals": actual_series - preds,
+                }
+            )
+            for model_name, preds in pred_series_dict.items()
+        ],
+        ignore_index=True,
+    )
+
+    fig, ax = plt.subplots(figsize=(6, 4))
+    palette = plt.colormaps["tab10"].colors  # type: ignore
+
+    ax = raincloudplot(x="residuals", y="model", palette=palette, data=df, ax=ax)
+
+    ax.set_xlabel("Residuals")
+    ax.set_ylabel("Model")
+
+    if suptitle is not None:
+        fig.suptitle(suptitle)
+
+    fig.tight_layout()
     return fig, ax

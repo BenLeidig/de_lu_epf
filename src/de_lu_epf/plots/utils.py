@@ -1,6 +1,8 @@
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import numpy as np
+import ptitprince as pt
 from yaml import safe_load
 
 
@@ -34,3 +36,47 @@ def plot_stacked_series(index, series_dict: dict, suptitle: str = None):  # type
     fig.tight_layout()
 
     return fig, axes
+
+
+def raincloudplot(x, y, palette, data, ax):
+    pt.half_violinplot(
+        x=x,
+        y=y,
+        scale="area",
+        palette=palette,
+        inner=None,
+        data=data,
+        width=1,
+        ax=ax,
+        orient="h",
+    )
+
+    groups = data[y].unique()
+    for i, g in enumerate(groups):
+        group_data = data[data[y] == g]
+        y_jitter = i + np.random.uniform(high=0.2, size=len(group_data))
+        x_jitter = group_data[x]
+        alpha = np.clip(2 / np.sqrt(len(group_data)), 0.05, 0.6)
+        ax.scatter(x_jitter, y_jitter, color=palette[i], alpha=alpha)
+
+    shift = 0.1
+    positions = [i + shift for i in range(len(groups))]
+    boxplot_data = [data[data[y] == g][x].values for g in groups]
+
+    medianprops = {"linewidth": 1.5, "color": "black", "solid_capstyle": "butt"}
+    boxprops = {"linewidth": 1.5, "color": "darkgray"}
+
+    ax.boxplot(
+        boxplot_data,
+        vert=False,
+        positions=positions,
+        manage_ticks=False,
+        showfliers=False,
+        showcaps=False,
+        medianprops=medianprops,
+        whiskerprops=boxprops,
+        boxprops=boxprops,
+    )
+
+    ax.tick_params(labelsize=13)
+    return ax
