@@ -79,10 +79,14 @@ def tune_vmd_tcn_lstm_mha(
         hidden_sizes = [hidden_size0, hidden_size1, hidden_size2]
 
         lstm_dropout0 = trial.suggest_float(
-            "lstm_dropout0", float(lstm_dropouts_range[0]), float(lstm_dropouts_range[1])
+            "lstm_dropout0",
+            float(lstm_dropouts_range[0]),
+            float(lstm_dropouts_range[1]),
         )
         lstm_dropout1 = trial.suggest_float(
-            "lstm_dropout1", float(lstm_dropouts_range[0]), float(lstm_dropouts_range[1])
+            "lstm_dropout1",
+            float(lstm_dropouts_range[0]),
+            float(lstm_dropouts_range[1]),
         )
         lstm_dropouts = [lstm_dropout0, lstm_dropout1]
 
@@ -90,7 +94,9 @@ def tune_vmd_tcn_lstm_mha(
         mha_dropout = trial.suggest_float(
             "mha_dropout", float(mha_dropout_range[0]), float(mha_dropout_range[1])
         )
-        mha_heads = trial.suggest_categorical("mha_heads", [int(h) for h in mha_heads_range])
+        mha_heads = trial.suggest_categorical(
+            "mha_heads", [int(h) for h in mha_heads_range]
+        )
         if hidden_sizes[-1] % mha_heads != 0:  # type: ignore
             raise optuna.TrialPruned()
 
@@ -108,7 +114,7 @@ def tune_vmd_tcn_lstm_mha(
         ## making the dataset considering the batch_size
         datamodule = ANNDataModule(
             data_dir=Path(__file__).resolve().parent.parent.parent.parent.parent
-            / "data/processed/vmd_data",
+            / "data/processed/hybrid",
             batch_size=batch_size,
             target_col=target_col,
             seq_len=seq_len,
