@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import pandas as pd
 from sklearn.metrics import mean_absolute_error, r2_score, root_mean_squared_error
 
@@ -56,6 +57,8 @@ if __name__ == "__main__":
     train_val_idx = df_train_val_actual.index
     test_idx = df_test_actual.index
 
+    #############################################################################################################################
+
     # PLOTTING TRAIN_VAL PREDS
     fig, _ = plot_predictions(
         index=train_val_idx,
@@ -65,14 +68,55 @@ if __name__ == "__main__":
     )
     fig.savefig(FIGS_DIR / "predictions/train_val_predictions.svg")
 
-    # PLOTTING TEST PREDS
-    fig, _ = plot_predictions(
-        index=test_idx,
-        actual_series_dict={"Actual": test_actual},
-        pred_series_dict=test_preds,
-        suptitle="Predicted Price on the Test Set",
+    # TEST SET PREDICTIONS
+    months = pd.date_range("2024-02-01", "2024-12-01", freq="MS", tz="utc")
+
+    fig = plt.figure(figsize=(12, 8))
+    gs = fig.add_gridspec(3, 4)
+
+    handles, labels = None, None
+
+    for i, month_start in enumerate(months):
+        row, col = divmod(i, 4)
+        ax = fig.add_subplot(gs[row, col])
+
+        month_end = month_start + pd.offsets.MonthEnd(1)
+        mask = (test_idx >= month_start) & (test_idx <= month_end)
+
+        idx_m = test_idx[mask]
+        actual_m = test_actual[mask]
+        preds_m = {model: preds[mask] for model, preds in test_preds.items()}
+
+        plot_predictions(
+            index=idx_m,
+            actual_series_dict={"Actual": actual_m},
+            pred_series_dict=preds_m,
+            ax=ax,
+        )
+
+        ax.set_title(month_start.strftime("%b"))
+
+        if handles is None:
+            handles, labels = ax.get_legend_handles_labels()
+
+        ax.legend().remove()
+    legend_ax = fig.add_subplot(gs[2, 3])
+    legend_ax.axis("off")
+
+    legend_ax.legend(
+        handles,
+        labels,
+        loc="center",
+        fontsize=10,
+        frameon=False,
+        ncol=1,
     )
-    fig.savefig(FIGS_DIR / "predictions/test_predictions.svg")
+
+    fig.suptitle("Monthly Test Set Predictions (2024)")
+    fig.tight_layout()
+    fig.savefig(FIGS_DIR / "predictions/monthly_test_predictions.svg")
+
+    #############################################################################################################################
 
     # PLOTTING TRAIN_VAL RESIDUALS
     fig, _ = plot_residuals(
@@ -84,13 +128,54 @@ if __name__ == "__main__":
     fig.savefig(FIGS_DIR / "predictions/train_val_residuals.svg")
 
     # PLOTTING TEST RESIDUALS
-    fig, _ = plot_residuals(
-        index=test_idx,
-        actual_series=test_actual,
-        pred_series_dict=test_preds,
-        suptitle="Residuals on the Test Set",
+    fig = plt.figure(figsize=(12, 8))
+    gs = fig.add_gridspec(3, 4)
+
+    handles, labels = None, None
+
+    for i, month_start in enumerate(months):
+        row, col = divmod(i, 4)
+        ax = fig.add_subplot(gs[row, col])
+
+        month_end = month_start + pd.offsets.MonthEnd(1)
+
+        mask = (test_idx >= month_start) & (test_idx <= month_end)
+
+        idx_m = test_idx[mask]
+        actual_m = test_actual[mask]
+        preds_m = {model: preds[mask] for model, preds in test_preds.items()}
+
+        plot_residuals(
+            index=idx_m,
+            actual_series=actual_m,
+            pred_series_dict=preds_m,
+            ax=ax,
+        )
+
+        ax.set_title(month_start.strftime("%b"))
+
+        if handles is None:
+            handles, labels = ax.get_legend_handles_labels()
+
+        ax.legend().remove()
+
+    legend_ax = fig.add_subplot(gs[2, 3])
+    legend_ax.axis("off")
+
+    legend_ax.legend(
+        handles,
+        labels,
+        loc="center",
+        fontsize=10,
+        frameon=False,
+        ncol=1,
     )
-    fig.savefig(FIGS_DIR / "predictions/test_residuals.svg")
+
+    fig.suptitle("Monthly Test Set Residuals (2024)")
+    fig.tight_layout()
+    fig.savefig(FIGS_DIR / "predictions/monthly_test_residuals.svg")
+
+    #############################################################################################################################
 
     # VIOLINPLOT TRAIN_VAL RESIDUALS
     fig, _ = plot_residuals_violinplot(
@@ -109,6 +194,8 @@ if __name__ == "__main__":
     fig.savefig(FIGS_DIR / "predictions/test_residuals_violinplot.svg")
 
     metrics = [mean_absolute_error, r2_score, root_mean_squared_error]
+
+    #############################################################################################################################
 
     # TRAIN_VAL METRIC BARPLOTS
     for metric in metrics:
@@ -135,6 +222,8 @@ if __name__ == "__main__":
             suptitle=f"{metric_name} Barplot for Test Set Predictions",
         )
         fig.savefig(FIGS_DIR / f"predictions/test_{metric.__name__}.svg")
+
+    #############################################################################################################################
 
     # RAINCLOUDPLOT TRAIN_VAL RESIDUALS
     fig, _ = plot_residuals_raincloud(

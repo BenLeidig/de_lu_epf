@@ -25,8 +25,8 @@ if __name__ == "__main__":
             ["train", "train_val"], ["val", "test"], ["partial", "full"]
         ):
             ### Load data
-            df_train = pd.read_parquet(data_path / f"{set}_data/{train}.parquet")
-            df_test = pd.read_parquet(data_path / f"{set}_data/{test}.parquet")
+            df_train = pd.read_parquet(data_path / f"{set}/{train}.parquet")
+            df_test = pd.read_parquet(data_path / f"{set}/{test}.parquet")
 
             if set == "dmf":  # Don't scale responses for DMF - only scale features
                 dmf_features = preprocess_cfg["dmf"]["features"]
@@ -49,13 +49,13 @@ if __name__ == "__main__":
 
             ### Save DataFrames
             df_train_scaled.to_parquet(
-                data_path / f"{set}_data/{train}_scaled.parquet", index=True
+                data_path / f"{set}/{train}_scaled.parquet", index=True
             )
             df_test_scaled.to_parquet(
-                data_path / f"{set}_data/{test}_scaled.parquet", index=True
+                data_path / f"{set}/{test}_scaled.parquet", index=True
             )
 
             ### Save scaler
-            dump(scaler, BASE_DIR / f"models/{set}_models/{folder}/scaler.pkl")
+            dump(scaler, BASE_DIR / f"models/{set}/{folder}/scaler.pkl")
 
     print("+" * 8, " `scale.py` completed. ", "+" * 8)

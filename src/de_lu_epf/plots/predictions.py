@@ -10,8 +10,13 @@ def plot_predictions(
     actual_series_dict,
     pred_series_dict: dict,
     suptitle: str = None,  # type: ignore
+    ax=None,
 ):
-    fig, ax = plt.subplots(figsize=(12, 8))
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(12, 8))
+    else:
+        fig = ax.figure
+
     colors = plt.colormaps["tab10"].colors  # type: ignore
 
     actual_label = list(actual_series_dict.keys())[0]
@@ -39,8 +44,7 @@ def plot_predictions(
 
     ax.legend()
     if suptitle is not None:
-        fig.suptitle(suptitle)
-    fig.tight_layout()
+        ax.set_title(suptitle)
 
     return fig, ax
 
@@ -50,8 +54,13 @@ def plot_residuals(
     actual_series,
     pred_series_dict: dict,
     suptitle: str = None,  # type: ignore
+    ax=None,
 ):
-    fig, ax = plt.subplots(figsize=(12, 8))
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(12, 8))
+    else:
+        fig = ax.figure
+
     colors = plt.colormaps["tab10"].colors  # type: ignore
 
     for i, (label, values) in enumerate(pred_series_dict.items()):
@@ -69,8 +78,7 @@ def plot_residuals(
 
     ax.legend()
     if suptitle is not None:
-        fig.suptitle(suptitle)
-    fig.tight_layout()
+        ax.set_title(suptitle)
 
     return fig, ax
 
