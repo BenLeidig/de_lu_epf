@@ -75,65 +75,6 @@ class DirectMultiStepForecaster(RegressorMixin, BaseEstimator):
         return preds
 
 
-class HybridForecaster(RegressorMixin, BaseEstimator):
-    def __init__(self, params: dict, model_class):
-        self.params = params
-        self.model_class = model_class
-
-    def fit(self, X, Y):
-        """Fit each mode's expert model. `X` and `Y` should be indexed hourly, with each column in `Y` representing an IMF (or IMF residual) to be forecasted.
-
-        Args:
-            X (array-like): Feature matrix to fit all expert models on. Should be indexed hourly.
-            Y (array-like): Target matrix to fit expert models on. Columns should be sorted ascending by mode number (with last one represent the IMF residual).
-
-        Raises:
-            ValueError: If the number of hyperparameter sets in `params` specified during initialization is not equal to the number of targets (should be 6).
-
-        Returns:
-            HybridForecaster: self.
-        """
-        # n0 = X.shape[0] = Y.shape[0]
-        # p = X.shape[1]
-        # q = Y.shape[1] = len(self.params)
-        # --------
-        # X.shape = (n0, p)
-        # Y.shape = (n0, q)
-        # y_i.shape = (n0, )
-
-        self.target_names_ = getattr(Y, "columns", None)
-        X, Y = validate_data(self, X, Y, multi_output=True)
-        self.models_ = {}
-
-        if len(self.params) != Y.shape[1]:
-            raise ValueError(
-                "Number of hyperparameter sets must match number of targets"
-            )
-
-        for mode in range(Y.shape[1]):
-            model = self.model_class(**self.params[mode])
-            model.fit(X, Y[:, mode])
-            self.models_[mode] = model
-
-        return self
-
-    def predict(self, X):
-        # n = X.shape[0]
-        # preds.shape = (n, q)
-
-        check_is_fitted(self, "models_")
-        idx = getattr(X, "index", None)
-        X = validate_data(self, X, reset=False)
-
-        preds = [self.models_[mode](X) for mode in sorted(self.models_)]
-        preds = np.column_stack(preds)
-
-        if self.target_names_ is not None:
-            return pd.DataFrame(preds, columns=self.target_names_, index=idx)
-
-        return preds
-
-
 class TCN_LSTM_MHA(pl.LightningModule):
     def __init__(
         self,

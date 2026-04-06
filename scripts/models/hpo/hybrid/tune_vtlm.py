@@ -29,4 +29,4 @@ if __name__ == "__main__":
     study = tune_vmd_tcn_lstm_mha(target_col=target_col, **cfg)
 
     # Save study
-    dump(study, studies_path / f"{target_col}_tcn_lstm_mha.pkl")
+    dump(study, studies_path / f"{target_col}_vtlm.pkl")
