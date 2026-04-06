@@ -66,7 +66,7 @@ def get_best_vtlm_params(target_col: str):
     CFG_DIR = BASE_DIR / "configs/models"
 
     with open(CFG_DIR / "hybrid_hyperparams_config.yaml") as f:
-        best_params = safe_load(f)["vtlm"]
+        best_params = safe_load(f)["vtlm"][target_col]
 
     batch_size = best_params.pop("batch_size")
     hidden_sizes = [
