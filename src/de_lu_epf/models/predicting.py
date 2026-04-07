@@ -140,12 +140,12 @@ def get_predictions_hybrid(model_name: str):
 
         y_train_val_pred = trainer.predict(model, dataloaders=train_val_dataloader)
         train_val_pred_dict[target_col] = (
-            torch.cat(y_train_val_pred, dim=0).detach().cpu().numpy()  # type: ignore
+            torch.cat(y_train_val_pred, dim=0).detach().cpu().numpy().reshape(-1)  # type: ignore
         )
 
         y_test_pred = trainer.predict(model, dataloaders=test_dataloader)
         test_pred_dict[target_col] = (
-            torch.cat(y_test_pred, dim=0).detach().cpu().numpy()  # type: ignore
+            torch.cat(y_test_pred, dim=0).detach().cpu().numpy().reshape(-1)  # type: ignore
         )
 
     train_val_start = pd.to_datetime(
