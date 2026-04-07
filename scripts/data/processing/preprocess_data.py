@@ -37,7 +37,9 @@ if __name__ == "__main__":
                 y_test = df_test[dmf_responses]
 
                 ### Scaled features
-                scaler, X_train_scaled, X_test_scaled = get_scaled(X_train, X_test)
+                scaler, _, X_train_scaled, X_test_scaled = get_scaled(
+                    X_train, X_test, targets=None
+                )
 
                 ### Concatenate scaled features and unscaled responses
                 df_train_scaled = pd.concat([X_train_scaled, y_train], axis=1)
@@ -45,7 +47,19 @@ if __name__ == "__main__":
 
             else:
                 ### Scale data
-                scaler, df_train_scaled, df_test_scaled = get_scaled(df_train, df_test)
+                feature_scaler, target_scaler, df_train_scaled, df_test_scaled = (
+                    get_scaled(
+                        df_train,
+                        df_test,
+                        targets=["imf1", "imf2", "imf3", "imf4", "imf5", "imf_resid"]
+                        if set == "hybrid"
+                        else ["price"],
+                    )
+                )
+
+                ### Save scalers
+                dump(feature_scaler, BASE_DIR / f"models/{set}/{folder}/feature_scaler.pkl")
+                dump(target_scaler, BASE_DIR / f"models/{set}/{folder}/target_scaler.pkl")
 
             ### Save DataFrames
             df_train_scaled.to_parquet(
@@ -54,8 +68,5 @@ if __name__ == "__main__":
             df_test_scaled.to_parquet(
                 data_path / f"{set}/{test}_scaled.parquet", index=True
             )
-
-            ### Save scaler
-            dump(scaler, BASE_DIR / f"models/{set}/{folder}/scaler.pkl")
 
     print("+" * 8, " `scale.py` completed. ", "+" * 8)

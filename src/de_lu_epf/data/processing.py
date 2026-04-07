@@ -117,7 +117,7 @@ def save_splits(df: pd.DataFrame, split_list: list, path: Path):
     train_val.to_parquet(path / "train_val.parquet", index=True)
 
 
-def get_scaled(df_train: pd.DataFrame, df_test: pd.DataFrame):
+def get_scaled(df_train: pd.DataFrame, df_test: pd.DataFrame, targets=None):
     """Scale the provided train and test datasets.
 
     Args:
@@ -125,13 +125,60 @@ def get_scaled(df_train: pd.DataFrame, df_test: pd.DataFrame):
         df_test (pd.DataFrame): Test data to transform.
 
     Returns:
-        tuple: Tuple of (fitted scaler, scaled train data, scaled test data).
+        See code for details on returned output.
     """
-    scaler = StandardScaler()
-    df_train_scaled = pd.DataFrame(
-        scaler.fit_transform(df_train), columns=df_train.columns, index=df_train.index
-    )
-    df_test_scaled = pd.DataFrame(
-        scaler.transform(df_test), columns=df_test.columns, index=df_test.index
-    )
-    return scaler, df_train_scaled, df_test_scaled
+
+    if targets:
+        features = [col for col in df_train.columns if col not in targets]
+        feature_scaler = StandardScaler()
+        target_scaler = StandardScaler()
+
+        df_train_scaled_features = pd.DataFrame(
+            feature_scaler.fit_transform(df_train.loc[:, features]),
+            columns=features,
+            index=df_train.index,
+        )
+        df_train_scaled_targets = pd.DataFrame(
+            target_scaler.fit_transform(df_train.loc[:, targets]),
+            columns=targets,
+            index=df_train.index,
+        )
+
+        df_test_scaled_features = pd.DataFrame(
+            feature_scaler.transform(df_test[features]),
+            columns=features,
+            index=df_test.index,
+        )
+        df_test_scaled_targets = pd.DataFrame(
+            target_scaler.transform(df_test[targets]),
+            columns=targets,
+            index=df_test.index,
+        )
+
+        df_train_scaled = pd.merge(
+            left=df_train_scaled_features,
+            right=df_train_scaled_targets,
+            left_index=True,
+            right_index=True,
+            how="inner",
+        )
+        df_test_scaled = pd.merge(
+            left=df_test_scaled_features,
+            right=df_test_scaled_targets,
+            left_index=True,
+            right_index=True,
+            how="inner",
+        )
+        return feature_scaler, target_scaler, df_train_scaled, df_test_scaled
+
+    else:
+        scaler = StandardScaler()
+        df_train_scaled = pd.DataFrame(
+            scaler.fit_transform(df_train),
+            columns=df_train.columns,
+            index=df_train.index,
+        )
+        df_test_scaled = pd.DataFrame(
+            scaler.transform(df_test), columns=df_test.columns, index=df_test.index
+        )
+        return scaler, None, df_train_scaled, df_test_scaled
