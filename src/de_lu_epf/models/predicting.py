@@ -157,13 +157,13 @@ def get_predictions_hybrid(model_name: str):
 
     train_val_idx = pd.date_range(
         start=train_val_start,
-        periods=len(train_val_pred_dict["imf1"]) * 24,
+        periods=len(train_val_pred_dict["imf1"]),
         freq="h",
     )
 
     test_idx = pd.date_range(
         start=test_start,
-        periods=len(test_pred_dict["imf1"]) * 24,
+        periods=len(test_pred_dict["imf1"]),
         freq="h",
     )
 
