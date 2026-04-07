@@ -1,190 +1,272 @@
 import matplotlib.pyplot as plt
 import pandas as pd
+import plotly.graph_objects as go
 import seaborn as sns
+from plotly.subplots import make_subplots
 
-from de_lu_epf.plots.utils import plot_series, raincloudplot
+
+def get_metric_name(metric):
+    return " ".join(part.capitalize() for part in metric.__name__.split("_"))
 
 
-def plot_predictions(
-    index,
-    actual_series_dict,
-    pred_series_dict: dict,
-    suptitle: str = None,  # type: ignore
-    ax=None,
-):
-    if ax is None:
-        fig, ax = plt.subplots(figsize=(12, 8))
-    else:
-        fig = ax.figure
+def plot_predictions_interactive(actual_series, pred_df, title=None):
+    model_names = list(pred_df.columns)
+    n_models = len(model_names)
 
-    colors = plt.colormaps["tab10"].colors  # type: ignore
+    fig = go.Figure()
 
-    actual_label = list(actual_series_dict.keys())[0]
-    actual_series = actual_series_dict[actual_label]
-    plot_series(
-        index=index,
-        values=actual_series,
-        ax=ax,
-        color="black",
-        label=actual_label,
-        linewidth=0.5,
+    fig.add_trace(
+        go.Scatter(
+            x=actual_series.index,
+            y=actual_series.values,
+            mode="lines",
+            name="Actual",
+            line=dict(color="black", width=1),
+            hovertemplate="Time: %{x}<br>Actual: %{y}<extra></extra>",
+            visible=True,
+        )
     )
 
-    for i, (label, values) in enumerate(pred_series_dict.items()):
-        color = colors[i % len(colors)]
-        plot_series(
-            index=index,
-            values=values,
-            ax=ax,
-            color=color,
-            label=label,
-            axhline=False,
-            linewidth=0.5,
+    for model_name in model_names:
+        fig.add_trace(
+            go.Scatter(
+                x=pred_df.index,
+                y=pred_df[model_name].values,
+                mode="lines",
+                name=model_name,
+                line=dict(width=1),
+                hovertemplate=f"Time: %{{x}}<br>{model_name}: %{{y}}<extra></extra>",
+                visible=True,
+            )
         )
 
-    ax.legend()
-    if suptitle is not None:
-        ax.set_title(suptitle)
+    buttons = []
 
-    return fig, ax
+    buttons.append(
+        dict(
+            label="All Models",
+            method="update",
+            args=[{"visible": [True] * (n_models + 1)}],
+        )
+    )
 
+    for i, model_name in enumerate(model_names):
+        visible = [True] + [False] * n_models
+        visible[i + 1] = True
 
-def plot_residuals(
-    index,
-    actual_series,
-    pred_series_dict: dict,
-    suptitle: str = None,  # type: ignore
-    ax=None,
-):
-    if ax is None:
-        fig, ax = plt.subplots(figsize=(12, 8))
-    else:
-        fig = ax.figure
-
-    colors = plt.colormaps["tab10"].colors  # type: ignore
-
-    for i, (label, values) in enumerate(pred_series_dict.items()):
-        color = colors[i % len(colors)]
-        residuals = actual_series - values
-        plot_series(
-            index=index,
-            values=residuals,
-            ax=ax,
-            color=color,
-            label=label,
-            axhline=True if i == 0 else False,
-            linewidth=0.5,
+        buttons.append(
+            dict(
+                label=model_name,
+                method="update",
+                args=[{"visible": visible}],
+            )
         )
 
-    ax.legend()
-    if suptitle is not None:
-        ax.set_title(suptitle)
-
-    return fig, ax
-
-
-def plot_residuals_violinplot(
-    actual_series,
-    pred_series_dict: dict,
-    suptitle: str = None,  # type: ignore
-):
-    fig, ax = plt.subplots(figsize=(6, 4))
-
-    data = []
-    for label, values in pred_series_dict.items():
-        residuals = actual_series - values
-        data.append(pd.DataFrame({"model": label, "residual": residuals}))
-    df = pd.concat(data, ignore_index=True)
-
-    palette = plt.colormaps["tab10"].colors  # type: ignore
-    ax.axhline(0, color="black", linewidth=0.7)
-    sns.violinplot(
-        data=df,
-        x="model",
-        y="residual",
-        ax=ax,
-        inner="box",
-        cut=0,
-        palette=palette,
-        hue="model",
-        legend=False,
+    fig.update_layout(
+        title=title,
+        xaxis_title="Datetime",
+        yaxis_title="Price",
+        hovermode="x unified",
+        template="plotly_white",
+        updatemenus=[
+            dict(
+                buttons=buttons,
+                direction="down",
+                showactive=True,
+                x=1.02,
+                xanchor="left",
+                y=1,
+                yanchor="top",
+            )
+        ],
+        legend=dict(
+            itemclick="toggle",
+            itemdoubleclick="toggleothers",
+        ),
     )
 
-    ax.set_xlabel("Model")
-    ax.set_ylabel("Residuals")
-    if suptitle is not None:
-        fig.suptitle(suptitle)
-    fig.tight_layout()
+    fig.update_xaxes(rangeslider_visible=True)
 
-    return fig, ax
+    return fig
 
 
-def plot_residuals_barplot(
-    actual_series,
-    pred_series_dict: dict,
-    metric,
-    suptitle: str = None,  # type: ignore
-):
+def plot_residuals_interactive(actual_series, pred_df, title=None):
+    residual_df = pred_df.sub(actual_series, axis=0).astype("float64")
+    zero_series = actual_series * 0.0
+
+    fig = plot_predictions_interactive(
+        actual_series=zero_series,
+        pred_df=residual_df,
+        title=title,
+    )
+
+    fig.update_layout(yaxis_title="Residual")
+    return fig
+
+
+def plot_metric_barplot(actual_series, pred_df, metric, title=None, ascending=True):
+    metric_name = get_metric_name(metric=metric)
+
+    scores = []
+    for model_name in pred_df.columns:
+        score = metric(actual_series, pred_df[model_name])
+        scores.append((model_name, score))
+
+    df_scores = pd.DataFrame(scores, columns=["model", "score"])
+    df_scores = df_scores.sort_values("score", ascending=ascending)
+
     fig, ax = plt.subplots(figsize=(6, 4))
 
-    metric_name = metric.__name__.split("_")
-    metric_name = [m[0].upper() + m[1:] for m in metric_name]
-    metric_name = " ".join(metric_name)
+    tableau_colors = plt.colormaps["tab10"].colors  # type: ignore
+    colors = [tableau_colors[i % len(tableau_colors)] for i in range(len(df_scores))]
 
-    data = []
-    for label, values in pred_series_dict.items():
-        score = metric(actual_series, values)
-        data.append({"model": label, "score": score})
-    df = pd.DataFrame(data)
+    bars = ax.bar(df_scores["model"], df_scores["score"], color=colors)
 
-    palette = plt.colormaps["tab10"].colors  # type: ignore
-    sns.barplot(
-        data=df,
-        x="model",
-        y="score",
-        ax=ax,
-        palette=palette,
-        hue="model",
-        legend=False,
-    )
+    y_min = min(0, df_scores["score"].min())
+    y_max = max(0, df_scores["score"].max())
+    y_range = y_max - y_min if y_max != y_min else 1
+
+    for bar, score in zip(bars, df_scores["score"]):
+        height = bar.get_height()
+        offset = 0.03 * y_range
+
+        if height >= 0:
+            y = height - offset
+            va = "top"
+        else:
+            y = height + offset
+            va = "bottom"
+
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            y,
+            f"{score:.3f}",
+            ha="center",
+            va=va,
+            color="white",
+            fontsize=9,
+            fontweight="bold",
+        )
 
     ax.set_xlabel("Model")
     ax.set_ylabel(metric_name)
-    if suptitle is not None:
-        fig.suptitle(suptitle)
-    fig.tight_layout()
 
+    if title is not None:
+        ax.set_title(title)
+
+    fig.tight_layout()
     return fig, ax
 
 
-def plot_residuals_raincloud(
-    actual_series,
-    pred_series_dict: dict,
-    suptitle: str = None,  # type: ignore
-):
-    df = pd.concat(
-        [
-            pd.DataFrame(
-                {
-                    "model": model_name,
-                    "residuals": actual_series - preds,
-                }
-            )
-            for model_name, preds in pred_series_dict.items()
-        ],
-        ignore_index=True,
+def plot_residual_violinplot(actual_series, pred_df, title=None):
+    residual_df = (
+        pred_df.sub(actual_series, axis=0)
+        .astype("float64")
+        .reset_index(names="datetime")
+    )
+    residual_df = residual_df.melt(
+        id_vars="datetime",
+        var_name="model",
+        value_name="residual",
     )
 
     fig, ax = plt.subplots(figsize=(6, 4))
-    palette = plt.colormaps["tab10"].colors  # type: ignore
 
-    ax = raincloudplot(x="residuals", y="model", palette=palette, data=df, ax=ax)
+    sns.violinplot(
+        data=residual_df, x="model", y="residual", palette="tab10", hue="model", ax=ax
+    )
 
-    ax.set_xlabel("Residuals")
-    ax.set_ylabel("Model")
+    ax.set_xlabel("Model")
+    ax.set_ylabel("Residual")
 
-    if suptitle is not None:
-        fig.suptitle(suptitle)
+    if title is not None:
+        ax.set_title(title)
 
     fig.tight_layout()
     return fig, ax
+
+
+# def _format_imf_label(name):
+#     name_lower = name.lower()
+#     if "resid" in name_lower:
+#         return "Residual"
+#     if name_lower.startswith("imf"):
+#         suffix = name_lower.replace("imf", "")
+#         return f"IMF {suffix}" if suffix.isdigit() else name.upper()
+#     return name.upper()
+
+
+# def plot_imf_predictions_interactive(pred_df, raw_df=None, title=None):
+#     pred_names = list(pred_df.columns)
+#     labels = [_format_imf_label(col) for col in pred_names]
+
+#     if raw_df is not None:
+#         raw_names = list(raw_df.columns)
+#         if raw_names != pred_names:
+#             raise ValueError(
+#                 "raw_df and pred_df must have the same columns in the same order"
+#             )
+
+#     n_rows = len(pred_names)
+
+#     fig = make_subplots(
+#         rows=n_rows,
+#         cols=1,
+#         shared_xaxes=True,
+#         vertical_spacing=0.02,
+#         subplot_titles=labels,
+#     )
+
+#     for i, (col, label) in enumerate(zip(pred_names, labels), start=1):
+#         if raw_df is not None:
+#             fig.add_trace(
+#                 go.Scatter(
+#                     x=raw_df.index,
+#                     y=raw_df[col].values,
+#                     mode="lines",
+#                     name="Actual",
+#                     line=dict(color="black", width=1),
+#                     hovertemplate=f"Time: %{{x}}<br>{label} Actual: %{{y}}<extra></extra>",
+#                     showlegend=(i == 1),
+#                     legendgroup="actual",
+#                 ),
+#                 row=i,
+#                 col=1,
+#             )
+
+#         fig.add_trace(
+#             go.Scatter(
+#                 x=pred_df.index,
+#                 y=pred_df[col].values,
+#                 mode="lines",
+#                 name="Predicted" if raw_df is not None else label,
+#                 line=dict(width=1),
+#                 hovertemplate=(
+#                     f"Time: %{{x}}<br>{label} Predicted: %{{y}}<extra></extra>"
+#                     if raw_df is not None
+#                     else f"Time: %{{x}}<br>{label}: %{{y}}<extra></extra>"
+#                 ),
+#                 showlegend=(i == 1),
+#                 legendgroup="predicted",
+#             ),
+#             row=i,
+#             col=1,
+#         )
+
+#         fig.update_yaxes(title_text=label, row=i, col=1)
+
+#     fig.update_layout(
+#         title=title,
+#         template="plotly_white",
+#         hovermode="x unified",
+#         height=max(220 * n_rows, 400),
+#         xaxis_title="Datetime",
+#         legend=dict(
+#             itemclick="toggle",
+#             itemdoubleclick="toggleothers",
+#         ),
+#     )
+
+#     fig.update_xaxes(rangeslider_visible=True, row=n_rows, col=1)
+
+#     return fig
