@@ -1,6 +1,0 @@
-random_state: 0
-
-# Variational Mode Decomposition
-vmd:
-  K: 5
-  alpha: 4000
