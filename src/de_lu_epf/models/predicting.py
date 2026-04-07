@@ -124,6 +124,18 @@ def get_predictions_hybrid(model_name: str):
         + pd.Timedelta(24 * 7 * 4, unit="h"),
     )
 
+    train_val_idx = pd.date_range(
+        start=train_val_range[0],
+        end=train_val_range[1],
+        freq="h",
+    )
+
+    test_idx = pd.date_range(
+        start=test_range[0],
+        end=test_range[1],
+        freq="h",
+    )
+
     train_val_pred_dict = {}
     test_pred_dict = {}
     targets = ["imf1", "imf2", "imf3", "imf4", "imf5", "imf_resid"]
@@ -152,18 +164,22 @@ def get_predictions_hybrid(model_name: str):
         )
 
         y_train_val_pred = trainer.predict(model, dataloaders=train_val_dataloader)
-        train_val_pred_dict[target_col] = torch.cat(y_train_val_pred, dim=0)  # type: ignore
+        train_val_pred_dict[target_col] = (
+            torch.cat(y_train_val_pred, dim=0).detach().cpu().numpy().ravel()  # type: ignore
+        )
 
         y_test_pred = trainer.predict(model, dataloaders=test_dataloader)
-        test_pred_dict[target_col] = torch.cat(y_test_pred, dim=0)  # type: ignore
+        test_pred_dict[target_col] = (
+            torch.cat(y_test_pred, dim=0).detach().cpu().numpy().ravel()  # type: ignore
+        )
 
-    train_val_pred_df = pd.DataFrame.from_dict(train_val_pred_dict, orient="columns")
-    train_val_pred_df["datetime"] = train_val_range
+    train_val_pred_df = pd.DataFrame(train_val_pred_dict)
+    train_val_pred_df["datetime"] = train_val_idx
     train_val_pred_df = train_val_pred_df.set_index("datetime")
     train_val_pred_df = train_val_pred_df[train_val_pred_df.index.year < 2024]
 
-    test_pred_df = pd.DataFrame.from_dict(test_pred_dict, orient="columns")
-    test_pred_df["datetime"] = test_range
+    test_pred_df = pd.DataFrame(test_pred_dict)
+    test_pred_df["datetime"] = test_idx
     test_pred_df = test_pred_df.set_index("datetime")
     test_pred_df = test_pred_df[test_pred_df.index.year == 2024]
 
