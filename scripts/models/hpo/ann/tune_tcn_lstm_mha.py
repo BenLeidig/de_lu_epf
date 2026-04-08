@@ -14,7 +14,7 @@ if __name__ == "__main__":
     # Set paths
     BASE_DIR = Path(__file__).parent.parent.parent.parent.parent
     cfg_path = BASE_DIR / "configs/models/hpo_config.yaml"
-    studies_path = BASE_DIR / f"studies/{model_type}/{model_name}"
+    studies_path = BASE_DIR / f"studies/{model_type}"
 
     # Set configs
     with open(cfg_path) as f:
