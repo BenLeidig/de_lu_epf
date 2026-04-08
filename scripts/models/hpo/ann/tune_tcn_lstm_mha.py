@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 import torch
@@ -8,8 +7,8 @@ from joblib import dump
 from de_lu_epf.models.hpo.ann_tuning import tune_tcn_lstm_mha
 
 if __name__ == "__main__":
-    model_type = "hybrid"
-    model_name = "vtlm"
+    model_type = "ann"
+    model_name = "tcn_lstm_mha"
     tuner = tune_tcn_lstm_mha
 
     # Set paths
@@ -21,16 +20,11 @@ if __name__ == "__main__":
     with open(cfg_path) as f:
         cfg = yaml.safe_load(f)["tcn-lstm-mha"]
 
-    # Get IMF
-    i = int(os.environ["SLURM_ARRAY_TASK_ID"])
-    targets = ["imf1", "imf2", "imf3", "imf4", "imf5", "imf_resid"]
-    target_col = targets[i]
-
     # Settings
     torch.multiprocessing.set_start_method("spawn", force=True)
 
     # Create study
-    study = tuner(target_col=target_col, model_type=model_type, **cfg)
+    study = tuner(target_col="price", model_type=model_type, **cfg)
 
     # Save study
-    dump(study, studies_path / f"{target_col}_{model_name}.pkl")
+    dump(study, studies_path / f"{model_name}.pkl")
