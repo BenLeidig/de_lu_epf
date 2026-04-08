@@ -76,7 +76,7 @@ class ANNDataModule(pl.LightningDataModule):
         data_dir: Path,
         batch_size: int,
         target_col: str,
-        seq_len: int = 24 * 7 * 4,
+        seq_len: int = 24 * 7 * 2,
         pred_len: int = 24,
         stride: int = 24,
     ):

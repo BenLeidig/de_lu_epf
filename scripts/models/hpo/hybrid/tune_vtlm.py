@@ -15,7 +15,7 @@ if __name__ == "__main__":
 
     # Set configs
     with open(cfg_path) as f:
-        cfg = yaml.safe_load(f)["vmd-tcn-lstm-mha"]
+        cfg = yaml.safe_load(f)["vtlm"]
 
     # Get IMF
     i = int(os.environ["SLURM_ARRAY_TASK_ID"])

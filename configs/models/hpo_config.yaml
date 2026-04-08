@@ -7,8 +7,8 @@ vmd:
   random_state: 0
 
 # VMD-TCN-LSTM-MHA
-vmd-tcn-lstm-mha:
-  seq_len: 672  # 24 * 7 * 4 = 4 weeks of lookback
+vtlm:
+  seq_len: 336  # 24 * 7 * 2 = 4 weeks of lookback
   pred_len: 24  # predicts whole next-day (hourly)
   stride: 24  # should be equal to pred_len
   batch_size_range: [16, 64]

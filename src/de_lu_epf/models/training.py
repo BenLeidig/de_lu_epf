@@ -2,7 +2,6 @@ from pathlib import Path
 
 import lightning.pytorch as pl
 import pandas as pd
-import torch
 from lightgbm import LGBMRegressor
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import ElasticNet, LinearRegression
@@ -93,7 +92,7 @@ def get_fitted_ann(
     params: dict,
     data_dir: Path,
     model_class,
-    seq_len: int = 24 * 7 * 4,
+    seq_len: int = 24 * 7 * 2,
     pred_len: int = 24,
     stride: int = 24,
     max_epochs: int = 35,

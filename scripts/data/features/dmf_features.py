@@ -2,7 +2,6 @@ from pathlib import Path
 from typing import Union
 
 import pandas as pd
-import yaml
 
 
 def create_dmf_cols(
