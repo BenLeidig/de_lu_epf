@@ -12,12 +12,90 @@ tcn-lstm-mha:
   pred_len: 24  # predicts whole next-day (hourly)
   stride: 24  # should be equal to pred_len
   batch_size_range: [16, 64]
-  lr_init_range: [1e-4, 1e-1]
+  lr_init_range: [1e-4, 1e-2]
   kernel_size_range: [2, 8]
   tcn_dropout_range: [0.0, 0.5]
   lstm_dropouts_range: [0.0, 0.5]
   mha_dropout_range: [0.0, 0.5]
   mha_heads_range: [1, 2, 4, 8, 16]
+  patience: 5
+  max_epochs: 50
+  reduction_factor: 3
+  n_trials: 1000
+  accelerator: gpu
+  random_state: 0
+
+tcn-lstm:
+  seq_len: 336  # 24 * 7 * 2 = 4 weeks of lookback
+  pred_len: 24  # predicts whole next-day (hourly)
+  stride: 24  # should be equal to pred_len
+  batch_size_range: [16, 64]
+  lr_init_range: [1e-4, 1e-2]
+  kernel_size_range: [2, 8]
+  tcn_dropout_range: [0.0, 0.5]
+  lstm_dropouts_range: [0.0, 0.5]
+  patience: 5
+  max_epochs: 50
+  reduction_factor: 3
+  n_trials: 1000
+  accelerator: gpu
+  random_state: 0
+
+tcn-mha:
+  seq_len: 336  # 24 * 7 * 2 = 4 weeks of lookback
+  pred_len: 24  # predicts whole next-day (hourly)
+  stride: 24  # should be equal to pred_len
+  batch_size_range: [16, 64]
+  lr_init_range: [1e-4, 1e-2]
+  kernel_size_range: [2, 8]
+  tcn_dropout_range: [0.0, 0.5]
+  mha_dropout_range: [0.0, 0.5]
+  mha_heads_range: [1, 2, 4, 8, 16]
+  patience: 5
+  max_epochs: 50
+  reduction_factor: 3
+  n_trials: 1000
+  accelerator: gpu
+  random_state: 0
+
+lstm-mha:
+  seq_len: 336  # 24 * 7 * 2 = 4 weeks of lookback
+  pred_len: 24  # predicts whole next-day (hourly)
+  stride: 24  # should be equal to pred_len
+  batch_size_range: [16, 64]
+  lr_init_range: [1e-4, 1e-2]
+  lstm_dropouts_range: [0.0, 0.5]
+  mha_dropout_range: [0.0, 0.5]
+  mha_heads_range: [1, 2, 4, 8, 16]
+  patience: 5
+  max_epochs: 50
+  reduction_factor: 3
+  n_trials: 1000
+  accelerator: gpu
+  random_state: 0
+
+tcn:
+  seq_len: 336  # 24 * 7 * 2 = 4 weeks of lookback
+  pred_len: 24  # predicts whole next-day (hourly)
+  stride: 24  # should be equal to pred_len
+  batch_size_range: [16, 64]
+  lr_init_range: [1e-4, 1e-2]
+  kernel_size_range: [2, 8]
+  tcn_dropout_range: [0.0, 0.5]
+  patience: 5
+  max_epochs: 50
+  reduction_factor: 3
+  n_trials: 1000
+  accelerator: gpu
+  random_state: 0
+
+lstm:
+  seq_len: 336  # 24 * 7 * 2 = 4 weeks of lookback
+  pred_len: 24  # predicts whole next-day (hourly)
+  stride: 24  # should be equal to pred_len
+  batch_size_range: [16, 64]
+  lr_init_range: [1e-4, 1e-2]
+  lstm_dropouts_range: [0.0, 0.5]
   patience: 5
   max_epochs: 50
   reduction_factor: 3

@@ -1,9 +1,9 @@
 import lightning.pytorch as pl
 import numpy as np
 import pandas as pd
+import pytorch_tcn
 import torch
 import torch.nn as nn
-from pytorch_tcn import TCN
 from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.utils.validation import check_is_fitted, validate_data  # type: ignore
 
@@ -94,11 +94,8 @@ class TCN_LSTM_MHA(pl.LightningModule):
         self.lr_init = lr_init
 
         #### model ####
-        # ReLU
-        self.relu = nn.ReLU()
-
         # TCN
-        self.tcn = TCN(
+        self.tcn = pytorch_tcn.TCN(
             num_inputs=input_size,
             num_channels=channel_sizes,
             kernel_size=kernel_size,
@@ -135,18 +132,385 @@ class TCN_LSTM_MHA(pl.LightningModule):
     def forward(self, x):
         # TCN
         x = self.tcn(x)
-        x = self.relu(x)
 
         # LSTM
         x, _ = self.lstm0(x)
-        x = self.relu(x)
         x = self.dropout0(x)
 
         x, _ = self.lstm1(x)
-        x = self.relu(x)
         x = self.dropout1(x)
 
         x, _ = self.lstm2(x)
+
+        # MHA
+        mha_out, _ = self.mha(x, x, x)
+        x = self.norm(x + mha_out)
+
+        # head
+        return self.fc(x[:, -1, :])
+
+    def training_step(self, batch, batch_idx):
+        x, y = batch
+        y_hat = self(x)
+        loss = self.criterion(y_hat, y)
+        self.log("train_loss", loss, on_step=False, on_epoch=True, batch_size=x.size(0))
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        x, y = batch
+        y_hat = self(x)
+        val_loss = self.criterion(y_hat, y)
+        self.log(
+            "val_loss", val_loss, on_step=False, on_epoch=True, batch_size=x.size(0)
+        )
+        return val_loss
+
+    def predict_step(self, batch, batch_idx):
+        x, _ = batch
+        return self(x)
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr_init)
+        return optimizer
+
+
+class LSTM_MHA(pl.LightningModule):
+    def __init__(
+        self,
+        input_size: int,
+        hidden_sizes: list,
+        lstm_dropouts: list,
+        mha_dropout: float,
+        mha_heads: int,
+        lr_init: float,
+    ):
+        super().__init__()
+        self.save_hyperparameters()
+        self.criterion = torch.nn.HuberLoss()
+        self.lr_init = lr_init
+
+        #### model ####
+        # LSTM
+        self.lstm0 = nn.LSTM(
+            input_size=input_size, hidden_size=hidden_sizes[0], batch_first=True
+        )
+        self.dropout0 = nn.Dropout(lstm_dropouts[0])
+        self.lstm1 = nn.LSTM(
+            input_size=hidden_sizes[0], hidden_size=hidden_sizes[1], batch_first=True
+        )
+        self.dropout1 = nn.Dropout(lstm_dropouts[1])
+        self.lstm2 = nn.LSTM(
+            input_size=hidden_sizes[1], hidden_size=hidden_sizes[2], batch_first=True
+        )
+
+        # MHA
+        self.mha = nn.MultiheadAttention(
+            embed_dim=hidden_sizes[-1],
+            num_heads=mha_heads,
+            dropout=mha_dropout,
+            batch_first=True,
+        )
+        self.norm = nn.LayerNorm(hidden_sizes[-1])
+
+        # head
+        self.fc = nn.Linear(hidden_sizes[-1], 24)
+
+    def forward(self, x):
+        # LSTM
+        x, _ = self.lstm0(x)
+        x = self.dropout0(x)
+
+        x, _ = self.lstm1(x)
+        x = self.dropout1(x)
+
+        x, _ = self.lstm2(x)
+
+        # MHA
+        mha_out, _ = self.mha(x, x, x)
+        x = self.norm(x + mha_out)
+
+        # head
+        return self.fc(x[:, -1, :])
+
+    def training_step(self, batch, batch_idx):
+        x, y = batch
+        y_hat = self(x)
+        loss = self.criterion(y_hat, y)
+        self.log("train_loss", loss, on_step=False, on_epoch=True, batch_size=x.size(0))
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        x, y = batch
+        y_hat = self(x)
+        val_loss = self.criterion(y_hat, y)
+        self.log(
+            "val_loss", val_loss, on_step=False, on_epoch=True, batch_size=x.size(0)
+        )
+        return val_loss
+
+    def predict_step(self, batch, batch_idx):
+        x, _ = batch
+        return self(x)
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr_init)
+        return optimizer
+
+
+class TCN_LSTM(pl.LightningModule):
+    def __init__(
+        self,
+        input_size: int,
+        channel_sizes: list,
+        kernel_size: int,
+        hidden_sizes: list,
+        tcn_dropout: float,
+        lstm_dropouts: list,
+        lr_init: float,
+    ):
+        super().__init__()
+        self.save_hyperparameters()
+        self.criterion = torch.nn.HuberLoss()
+        self.lr_init = lr_init
+
+        #### model ####
+        # TCN
+        self.tcn = pytorch_tcn.TCN(
+            num_inputs=input_size,
+            num_channels=channel_sizes,
+            kernel_size=kernel_size,
+            dropout=tcn_dropout,
+            use_skip_connections=True,
+            input_shape="NLC",  # (batch_size, time_steps, feature_channels)
+        )
+
+        # LSTM
+        self.lstm0 = nn.LSTM(
+            input_size=channel_sizes[-1], hidden_size=hidden_sizes[0], batch_first=True
+        )
+        self.dropout0 = nn.Dropout(lstm_dropouts[0])
+        self.lstm1 = nn.LSTM(
+            input_size=hidden_sizes[0], hidden_size=hidden_sizes[1], batch_first=True
+        )
+        self.dropout1 = nn.Dropout(lstm_dropouts[1])
+        self.lstm2 = nn.LSTM(
+            input_size=hidden_sizes[1], hidden_size=hidden_sizes[2], batch_first=True
+        )
+
+        # head
+        self.fc = nn.Linear(hidden_sizes[-1], 24)
+
+    def forward(self, x):
+        # TCN
+        x = self.tcn(x)
+
+        # LSTM
+        x, _ = self.lstm0(x)
+        x = self.dropout0(x)
+
+        x, _ = self.lstm1(x)
+        x = self.dropout1(x)
+
+        x, _ = self.lstm2(x)
+
+        # head
+        return self.fc(x[:, -1, :])
+
+    def training_step(self, batch, batch_idx):
+        x, y = batch
+        y_hat = self(x)
+        loss = self.criterion(y_hat, y)
+        self.log("train_loss", loss, on_step=False, on_epoch=True, batch_size=x.size(0))
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        x, y = batch
+        y_hat = self(x)
+        val_loss = self.criterion(y_hat, y)
+        self.log(
+            "val_loss", val_loss, on_step=False, on_epoch=True, batch_size=x.size(0)
+        )
+        return val_loss
+
+    def predict_step(self, batch, batch_idx):
+        x, _ = batch
+        return self(x)
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr_init)
+        return optimizer
+
+
+class LSTM(pl.LightningModule):
+    def __init__(
+        self,
+        input_size: int,
+        hidden_sizes: list,
+        lstm_dropouts: list,
+        lr_init: float,
+    ):
+        super().__init__()
+        self.save_hyperparameters()
+        self.criterion = torch.nn.HuberLoss()
+        self.lr_init = lr_init
+
+        #### model ####
+        # LSTM
+        self.lstm0 = nn.LSTM(
+            input_size=input_size, hidden_size=hidden_sizes[0], batch_first=True
+        )
+        self.dropout0 = nn.Dropout(lstm_dropouts[0])
+        self.lstm1 = nn.LSTM(
+            input_size=hidden_sizes[0], hidden_size=hidden_sizes[1], batch_first=True
+        )
+        self.dropout1 = nn.Dropout(lstm_dropouts[1])
+        self.lstm2 = nn.LSTM(
+            input_size=hidden_sizes[1], hidden_size=hidden_sizes[2], batch_first=True
+        )
+
+        # head
+        self.fc = nn.Linear(hidden_sizes[-1], 24)
+
+    def forward(self, x):
+        # LSTM
+        x, _ = self.lstm0(x)
+        x = self.dropout0(x)
+
+        x, _ = self.lstm1(x)
+        x = self.dropout1(x)
+
+        x, _ = self.lstm2(x)
+
+        # head
+        return self.fc(x[:, -1, :])
+
+    def training_step(self, batch, batch_idx):
+        x, y = batch
+        y_hat = self(x)
+        loss = self.criterion(y_hat, y)
+        self.log("train_loss", loss, on_step=False, on_epoch=True, batch_size=x.size(0))
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        x, y = batch
+        y_hat = self(x)
+        val_loss = self.criterion(y_hat, y)
+        self.log(
+            "val_loss", val_loss, on_step=False, on_epoch=True, batch_size=x.size(0)
+        )
+        return val_loss
+
+    def predict_step(self, batch, batch_idx):
+        x, _ = batch
+        return self(x)
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr_init)
+        return optimizer
+
+
+class TCN(pl.LightningModule):
+    def __init__(
+        self,
+        input_size: int,
+        channel_sizes: list,
+        kernel_size: int,
+        tcn_dropout: float,
+        lr_init: float,
+    ):
+        super().__init__()
+        self.save_hyperparameters()
+        self.criterion = torch.nn.HuberLoss()
+        self.lr_init = lr_init
+
+        #### model ####
+        # TCN
+        self.tcn = pytorch_tcn.TCN(
+            num_inputs=input_size,
+            num_channels=channel_sizes,
+            kernel_size=kernel_size,
+            dropout=tcn_dropout,
+            use_skip_connections=True,
+            input_shape="NLC",  # (batch_size, time_steps, feature_channels)
+        )
+
+        # head
+        self.fc = nn.Linear(channel_sizes[-1], 24)
+
+    def forward(self, x):
+        # TCN
+        x = self.tcn(x)
+
+        # head
+        return self.fc(x[:, -1, :])
+
+    def training_step(self, batch, batch_idx):
+        x, y = batch
+        y_hat = self(x)
+        loss = self.criterion(y_hat, y)
+        self.log("train_loss", loss, on_step=False, on_epoch=True, batch_size=x.size(0))
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        x, y = batch
+        y_hat = self(x)
+        val_loss = self.criterion(y_hat, y)
+        self.log(
+            "val_loss", val_loss, on_step=False, on_epoch=True, batch_size=x.size(0)
+        )
+        return val_loss
+
+    def predict_step(self, batch, batch_idx):
+        x, _ = batch
+        return self(x)
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr_init)
+        return optimizer
+
+
+class TCN_MHA(pl.LightningModule):
+    def __init__(
+        self,
+        input_size: int,
+        channel_sizes: list,
+        kernel_size: int,
+        tcn_dropout: float,
+        mha_dropout: float,
+        mha_heads: int,
+        lr_init: float,
+    ):
+        super().__init__()
+        self.save_hyperparameters()
+        self.criterion = torch.nn.HuberLoss()
+        self.lr_init = lr_init
+
+        #### model ####
+        # TCN
+        self.tcn = pytorch_tcn.TCN(
+            num_inputs=input_size,
+            num_channels=channel_sizes,
+            kernel_size=kernel_size,
+            dropout=tcn_dropout,
+            use_skip_connections=True,
+            input_shape="NLC",  # (batch_size, time_steps, feature_channels)
+        )
+
+        # MHA
+        self.mha = nn.MultiheadAttention(
+            embed_dim=channel_sizes[-1],
+            num_heads=mha_heads,
+            dropout=mha_dropout,
+            batch_first=True,
+        )
+        self.norm = nn.LayerNorm(channel_sizes[-1])
+
+        # head
+        self.fc = nn.Linear(channel_sizes[-1], 24)
+
+    def forward(self, x):
+        # TCN
+        x = self.tcn(x)
 
         # MHA
         mha_out, _ = self.mha(x, x, x)
