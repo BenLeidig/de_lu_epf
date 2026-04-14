@@ -11,7 +11,7 @@
 #SBATCH --mem=32G
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=bleidig2@illinois.edu
-#SBATCH --time=168:00:00
+#SBATCH --time=48:00:00
 #SBATCH --array=0-23
 
 USER_DIR=/u/$USER
