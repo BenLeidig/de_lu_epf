@@ -1,17 +1,17 @@
 from pathlib import Path
 
 import de_lu_epf.models.architectures as arc
-from de_lu_epf.models.predicting import get_predictions_hybrid
+from de_lu_epf.models.predicting import get_predictions_ann
 
 if __name__ == "__main__":
     BASE_DIR = Path(__file__).parent.parent.parent.parent.parent
     DATA_DIR = BASE_DIR / "data/predictions"
 
-    model_name = "vtlm"
-    model_class = arc.TCN_LSTM_MHA
-    model_type = "hybrid"
+    model_name = "tcn_lstm"
+    model_class = arc.TCN_LSTM
+    model_type = "ann"
 
-    y_train_val_pred, y_test_pred = get_predictions_hybrid(
+    y_train_val_pred, y_test_pred = get_predictions_ann(
         model_name=model_name, model_class=model_class
     )
 

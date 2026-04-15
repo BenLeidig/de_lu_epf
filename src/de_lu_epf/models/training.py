@@ -126,15 +126,22 @@ def get_fitted_ann(
     early_stopping_cb = pl.callbacks.EarlyStopping(  # type: ignore
         monitor="val_loss", patience=patience, mode="min"
     )
+
+    BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent.parent
+    dirpath = (
+        BASE_DIR / f"models/{model_type}/full/{model_name}/{target_col}_{model_name}.ckpt"
+        if model_type == "hybrid"
+        else BASE_DIR / f"models/{model_type}/full/{model_name}"
+    )
     ckpt_cb = pl.callbacks.ModelCheckpoint(  # type: ignore
-        dirpath=Path(__file__).resolve().parent.parent.parent.parent.parent
-        / f"models/{model_type}/full/{model_name}",
+        dirpath=dirpath,
         filename="best",
         monitor="val_loss",
         mode="min",
         save_top_k=1,
         save_last=False,
     )
+
     callbacks = [early_stopping_cb, ckpt_cb]
 
     #### training ####

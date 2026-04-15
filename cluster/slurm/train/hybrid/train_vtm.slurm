@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=predict_vtlm
-#SBATCH --output=/u/%u/de_lu_epf/logs/slurm/out/predict_vtlm.out
-#SBATCH --error=/u/%u/de_lu_epf/logs/slurm/err/predict_vtlm.err
+#SBATCH --job-name=train_vtm_imf%a
+#SBATCH --output=/u/%u/de_lu_epf/logs/slurm/out/train_vtm_imf%a.out
+#SBATCH --error=/u/%u/de_lu_epf/logs/slurm/err/train_vtm_imf%a.err
 #SBATCH --account=stat
 #SBATCH --partition=stat
 #SBATCH --nodes=1
@@ -11,10 +11,11 @@
 #SBATCH --gres=gpu:1
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=bleidig2@illinois.edu
-#SBATCH --time=2:00:00
+#SBATCH --time=24:00:00
+#SBATCH --array=0-5
 
 USER_DIR=/u/$USER
 
 source $USER_DIR/venvs/.venv/bin/activate
 export PYTHONPATH=$USER_DIR/de_lu_epf
-srun python $USER_DIR/de_lu_epf/scripts/models/predict/hybrid/predict_vtlm.py
+srun python $USER_DIR/de_lu_epf/scripts/models/train/hybrid/train_vtm.py

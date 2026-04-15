@@ -7,8 +7,8 @@ if __name__ == "__main__":
     BASE_DIR = Path(__file__).parent.parent.parent.parent.parent
     DATA_DIR = BASE_DIR / "data/predictions"
 
-    model_name = "vtlm"
-    model_class = arc.TCN_LSTM_MHA
+    model_name = "vtl"
+    model_class = arc.TCN_LSTM
     model_type = "hybrid"
 
     y_train_val_pred, y_test_pred = get_predictions_hybrid(

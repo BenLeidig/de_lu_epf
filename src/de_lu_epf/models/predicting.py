@@ -8,8 +8,7 @@ from joblib import load
 from yaml import safe_load
 
 from de_lu_epf.data.loading import ANNDataModule
-from de_lu_epf.models.architectures import TCN_LSTM_MHA
-from de_lu_epf.models.training import get_best_vtlm_params
+from de_lu_epf.models.training import get_best_ann_params
 
 
 def fetch_train_val_data(model_type: str):
@@ -101,7 +100,7 @@ def get_predictions_dmf(model_name: str):
     return y_train_val_pred, y_test_pred
 
 
-def get_predictions_hybrid(model_name: str):
+def get_predictions_hybrid(model_name: str, model_class):
 
     BASE_DIR = Path(__file__).parent.parent.parent.parent
     DATA_DIR = BASE_DIR / "data/processed/hybrid"
@@ -111,11 +110,14 @@ def get_predictions_hybrid(model_name: str):
     with open(CFG_DIR / "data/process_config.yaml") as f:
         dt_range_cfg = safe_load(f)["dt_range"]
 
+    seq_len = 24 * 7 * 2
     train_val_pred_dict = {}
     test_pred_dict = {}
     targets = ["imf1", "imf2", "imf3", "imf4", "imf5", "imf_resid"]
     for target_col in targets:
-        batch_size, params = get_best_vtlm_params(target_col=target_col)
+        batch_size, params = get_best_ann_params(
+            target_col=target_col, model_name=model_name, model_type="hybrid"
+        )
 
         datamodule = ANNDataModule(
             data_dir=DATA_DIR, batch_size=batch_size, target_col=target_col
@@ -124,12 +126,11 @@ def get_predictions_hybrid(model_name: str):
         train_val_dataloader = datamodule.train_val_dataloader()
         test_dataloader = datamodule.test_dataloader()
 
-        state_dict = torch.load(
-            MODEL_DIR / f"{model_name}/{target_col}_{model_name}.pt"
+        model = model_class.load_from_checkpoint(
+            MODEL_DIR / f"{model_name}/{target_col}_{model_name}.ckpt",
+            input_size=datamodule.input_size,
+            **params,
         )
-
-        model = TCN_LSTM_MHA(input_size=datamodule.input_size, **params)
-        model.load_state_dict(state_dict=state_dict)
         model.eval()
 
         trainer = pl.Trainer(
@@ -150,9 +151,9 @@ def get_predictions_hybrid(model_name: str):
 
     train_val_start = pd.to_datetime(
         dt_range_cfg["train"]["start"], utc=True
-    ) + pd.Timedelta(24 * 7 * 4, "h")
+    ) + pd.Timedelta(seq_len, "h")
     test_start = pd.to_datetime(dt_range_cfg["test"]["start"], utc=True) + pd.Timedelta(
-        24 * 7 * 4, "h"
+        seq_len, "h"
     )
 
     train_val_idx = pd.date_range(
@@ -191,5 +192,97 @@ def get_predictions_hybrid(model_name: str):
 
     train_val_pred_df["price"] = train_val_pred_df.sum(axis=1)
     test_pred_df["price"] = test_pred_df.sum(axis=1)
+
+    return train_val_pred_df, test_pred_df
+
+
+def get_predictions_ann(model_name: str, model_class):
+
+    BASE_DIR = Path(__file__).parent.parent.parent.parent
+    DATA_DIR = BASE_DIR / "data/processed/ann"
+    CFG_DIR = BASE_DIR / "configs"
+    MODEL_DIR = BASE_DIR / "models/ann/full"
+
+    with open(CFG_DIR / "data/process_config.yaml") as f:
+        dt_range_cfg = safe_load(f)["dt_range"]
+
+    seq_len = 24 * 7 * 2
+    target_col = "price"
+    train_val_pred_dict = {}
+    test_pred_dict = {}
+    batch_size, params = get_best_ann_params(
+        target_col=target_col, model_name=model_name, model_type="ann"
+    )
+
+    datamodule = ANNDataModule(
+        data_dir=DATA_DIR, batch_size=batch_size, target_col=target_col
+    )
+    datamodule.setup()
+    train_val_dataloader = datamodule.train_val_dataloader()
+    test_dataloader = datamodule.test_dataloader()
+
+    model = model_class.load_from_checkpoint(
+        MODEL_DIR / f"{model_name}.ckpt",
+        input_size=datamodule.input_size,
+        **params,
+    )
+    model.eval()
+
+    trainer = pl.Trainer(
+        accelerator="auto",
+        logger=False,
+        enable_checkpointing=False,
+    )
+
+    y_train_val_pred = trainer.predict(model, dataloaders=train_val_dataloader)
+    train_val_pred_dict[target_col] = (
+        torch.cat(y_train_val_pred, dim=0).detach().cpu().numpy().reshape(-1)  # type: ignore
+    )
+
+    y_test_pred = trainer.predict(model, dataloaders=test_dataloader)
+    test_pred_dict[target_col] = (
+        torch.cat(y_test_pred, dim=0).detach().cpu().numpy().reshape(-1)  # type: ignore
+    )
+
+    train_val_start = pd.to_datetime(
+        dt_range_cfg["train"]["start"], utc=True
+    ) + pd.Timedelta(seq_len, "h")
+    test_start = pd.to_datetime(dt_range_cfg["test"]["start"], utc=True) + pd.Timedelta(
+        seq_len, "h"
+    )
+
+    train_val_idx = pd.date_range(
+        start=train_val_start,
+        periods=len(train_val_pred_dict[target_col]),
+        freq="h",
+    )
+
+    test_idx = pd.date_range(
+        start=test_start,
+        periods=len(test_pred_dict[[target_col]]),
+        freq="h",
+    )
+
+    train_val_pred_df = pd.DataFrame(train_val_pred_dict)
+    train_val_pred_df["datetime"] = train_val_idx
+    train_val_pred_df = train_val_pred_df.set_index("datetime")
+    train_val_pred_df = train_val_pred_df[train_val_pred_df.index.year < 2024]
+
+    test_pred_df = pd.DataFrame(test_pred_dict)
+    test_pred_df["datetime"] = test_idx
+    test_pred_df = test_pred_df.set_index("datetime")
+    test_pred_df = test_pred_df[test_pred_df.index.year == 2024]
+
+    _, target_scaler = fetch_full_scalers(model_type="ann")
+    train_val_pred_df = pd.DataFrame(
+        data=target_scaler.inverse_transform(train_val_pred_df),
+        columns=train_val_pred_df.columns,
+        index=train_val_pred_df.index,
+    )
+    test_pred_df = pd.DataFrame(
+        data=target_scaler.inverse_transform(test_pred_df),
+        columns=test_pred_df.columns,
+        index=test_pred_df.index,
+    )
 
     return train_val_pred_df, test_pred_df
