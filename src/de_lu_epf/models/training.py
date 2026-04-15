@@ -6,6 +6,7 @@ from lightgbm import LGBMRegressor
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import ElasticNet, LinearRegression
 from sklearn.svm import SVR
+from torch import lstm
 from xgboost import XGBRegressor
 from yaml import safe_load
 
@@ -59,71 +60,106 @@ def get_fitted_dmf(model_name: str):
     return dmf
 
 
-def get_best_vtlm_params(target_col: str):
+def get_best_ann_params(target_col: str, model_name: str, model_type: str):
 
     BASE_DIR = Path(__file__).parent.parent.parent.parent
     CFG_DIR = BASE_DIR / "configs/models"
 
-    with open(CFG_DIR / "hybrid_hyperparams_config.yaml") as f:
-        best_params = safe_load(f)["vtlm"][target_col]
+    with open(CFG_DIR / f"{model_type}_hyperparams_config.yaml") as f:
+        if model_type == "hybrid":
+            best_params = safe_load(f)[model_name][target_col].copy()
+        else:
+            best_params = safe_load(f)[model_name].copy()
 
     batch_size = best_params.pop("batch_size")
-    hidden_sizes = [
-        best_params.pop("hidden_size0"),
-        best_params.pop("hidden_size1"),
-        best_params.pop("hidden_size2"),
-    ]
-    lstm_dropouts = [best_params.pop("lstm_dropout0"), best_params.pop("lstm_dropout1")]
-    channel_sizes = []
-    channel_size_keys = list(best_params.keys())
-    for s in channel_size_keys:
-        if "channel_size_" in s:
+    params = {"lr_init": best_params.pop("lr_init")}
+
+    if "hidden_size0" in best_params:
+        hidden_sizes = [
+            best_params.pop("hidden_size0"),
+            best_params.pop("hidden_size1"),
+            best_params.pop("hidden_size2"),
+        ]
+        lstm_dropouts = [
+            best_params.pop("lstm_dropout0"),
+            best_params.pop("lstm_dropout1"),
+        ]
+        params["hidden_sizes"] = hidden_sizes
+        params["lstm_dropouts"] = lstm_dropouts
+
+    if any("channel_size" in key for key in best_params):
+        channel_sizes = []
+        channel_size_keys = sorted(
+            [key for key in best_params if "channel_size" in key],
+            key=lambda x: int(x.split("_")[-1]),
+        )
+        for s in channel_size_keys:
             channel_sizes.append(best_params.pop(s))
-    params = best_params.copy()
-    params["hidden_sizes"] = hidden_sizes
-    params["lstm_dropouts"] = lstm_dropouts
-    params["channel_sizes"] = channel_sizes
+        params["channel_sizes"] = channel_sizes
+        params["tcn_dropout"] = best_params.pop("tcn_dropout")
+        params["kernel_size"] = best_params.pop("kernel_size")
+
+    if "mha_dropout" in best_params:
+        params["mha_dropout"] = best_params.pop("mha_dropout")
+        params["mha_heads"] = best_params.pop("mha_heads")
+
     return batch_size, params
 
 
 def get_fitted_ann(
-    target_col: str,
-    batch_size: int,
-    params: dict,
-    data_dir: Path,
     model_class,
-    seq_len: int = 24 * 7 * 2,
-    pred_len: int = 24,
-    stride: int = 24,
-    max_epochs: int = 35,
-    accelerator="auto",
+    params: dict,
+    target_col: str,
+    model_type: str,
+    model_name: str,
+    seq_len: int,
+    pred_len: int,
+    stride: int,
+    batch_size: int,
+    patience: int = 5,
+    max_epochs: int = 50,
+    accelerator: str = "gpu",
+    random_state: int = 0,
 ):
+    pl.seed_everything(random_state)
 
-    pl.seed_everything(0)
+    early_stopping_cb = pl.callbacks.EarlyStopping(  # type: ignore
+        monitor="val_loss", patience=patience, mode="min"
+    )
+    ckpt_cb = pl.callbacks.ModelCheckpoint(  # type: ignore
+        dirpath=Path(__file__).resolve().parent.parent.parent.parent.parent
+        / f"models/{model_type}/full/{model_name}",
+        filename="best",
+        monitor="val_loss",
+        mode="min",
+        save_top_k=1,
+        save_last=False,
+    )
+    callbacks = [early_stopping_cb, ckpt_cb]
 
+    #### training ####
+    ## making the dataset considering the batch_size
     datamodule = ANNDataModule(
-        data_dir=data_dir,
+        data_dir=Path(__file__).resolve().parent.parent.parent.parent.parent
+        / f"data/processed/{model_type}",
         batch_size=batch_size,
         target_col=target_col,
         seq_len=seq_len,
         pred_len=pred_len,
         stride=stride,
     )
-    datamodule.setup("test")
-    train_val_dataloader = datamodule.train_val_dataloader()
-    # test_dataloader = datamodule.test_dataloader()
+    datamodule.setup("fit")
     input_size = datamodule.input_size
 
-    model = model_class(input_size=input_size, **params)
-    trainer = pl.Trainer(
+    mod = model_class(input_size=input_size, **params)
+
+    trainer = pl.Trainer(  ## instantiating the trainer given the model and callbacks
         max_epochs=max_epochs,
+        callbacks=callbacks,
         accelerator=accelerator,
         logger=False,
-        enable_checkpointing=False,
+        enable_checkpointing=True,
+        gradient_clip_val=1.0,
+        gradient_clip_algorithm="norm",
     )
-
-    trainer.fit(model, train_dataloaders=train_val_dataloader)
-    # y_test_pred = trainer.predict(model, dataloaders=test_dataloader)
-    # y_test_pred = torch.cat(y_test_pred, dim=0)  # type: ignore
-
-    return model  # , y_test_pred
+    trainer.fit(mod, datamodule=datamodule)  ## fitting the trainer

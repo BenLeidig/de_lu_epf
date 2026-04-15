@@ -1,20 +1,16 @@
-import os
-
 import de_lu_epf.models.architectures as arc
 from de_lu_epf.models.training import get_best_ann_params, get_fitted_ann
 
 if __name__ == "__main__":
-    model_name = "vtlm"
-    model_class = arc.TCN_LSTM_MHA
-    model_type = "hybrid"
+    model_name = "lstm_mha"
+    model_class = arc.LSTM_MHA
+    model_type = "ann"
 
-    i = int(os.environ["SLURM_ARRAY_TASK_ID"])
-    targets = ["imf1", "imf2", "imf3", "imf4", "imf5", "imf_resid"]
-    target_col = targets[i]
+    target_col = "price"
 
     batch_size, params = get_best_ann_params(
         target_col=target_col, model_name=model_name, model_type=model_type
-    )
+    )  # target_col not actually needed here for ANN non-Hybrid models
 
     get_fitted_ann(
         model_class=model_class,

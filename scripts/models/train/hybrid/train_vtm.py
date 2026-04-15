@@ -4,8 +4,8 @@ import de_lu_epf.models.architectures as arc
 from de_lu_epf.models.training import get_best_ann_params, get_fitted_ann
 
 if __name__ == "__main__":
-    model_name = "vtlm"
-    model_class = arc.TCN_LSTM_MHA
+    model_name = "vtm"
+    model_class = arc.TCN_LSTM
     model_type = "hybrid"
 
     i = int(os.environ["SLURM_ARRAY_TASK_ID"])
