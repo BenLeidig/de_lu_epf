@@ -75,13 +75,13 @@ def get_predictions_dmf(model_name: str):
     Y_test_pred = dmf.predict(X_test_scaled)
 
     train_val_idx = pd.date_range(
-        start=df_train_val_scaled.index[0] + pd.Timedelta(value=1, unit="h"),
+        start=df_train_val_scaled.index[0],
         periods=Y_train_val_pred.shape[0] * Y_train_val_pred.shape[1],
         freq="h",
         tz="UTC",
     )
     test_idx = pd.date_range(
-        start=df_test_scaled.index[0] + pd.Timedelta(value=1, unit="h"),
+        start=df_test_scaled.index[0],
         periods=Y_test_pred.shape[0] * Y_test_pred.shape[1],
         freq="h",
         tz="UTC",
