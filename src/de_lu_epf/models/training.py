@@ -67,9 +67,9 @@ def get_best_ann_params(target_col: str, model_name: str, model_type: str):
 
     with open(CFG_DIR / f"{model_type}_hyperparams_config.yaml") as f:
         if model_type == "hybrid":
-            best_params = safe_load(f)[model_name][target_col].copy()
+            best_params = safe_load(f)[model_name.replace("_", "-")][target_col].copy()
         else:
-            best_params = safe_load(f)[model_name].copy()
+            best_params = safe_load(f)[model_name.replace("_", "-")].copy()
 
     batch_size = best_params.pop("batch_size")
     params = {"lr_init": best_params.pop("lr_init")}

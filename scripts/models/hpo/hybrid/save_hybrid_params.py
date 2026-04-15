@@ -9,7 +9,7 @@ if __name__ == "__main__":
     CFG_PATH = BASE_DIR / "configs/models/hybrid_hyperparams_config.yaml"
 
     imf_dict = {}
-    imf_mods = ["vtlm"]
+    imf_mods = ["vl", "vlm", "vt", "vtl", "vtlm", "vtm"]
 
     for mod_name in imf_mods:
         imf_dict[mod_name] = {}

@@ -18,7 +18,7 @@ if __name__ == "__main__":
 
     # Set configs
     with open(cfg_path) as f:
-        cfg = yaml.safe_load(f)["tcn"]
+        cfg = yaml.safe_load(f)[model_name.replace("_", "-")]
 
     # Settings
     torch.multiprocessing.set_start_method("spawn", force=True)
