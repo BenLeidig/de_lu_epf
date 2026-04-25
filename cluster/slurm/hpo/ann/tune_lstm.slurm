@@ -11,7 +11,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=bleidig2@illinois.edu
-#SBATCH --time=48:00:00
+#SBATCH --time=96:00:00
 
 USER_DIR=/u/$USER
 
