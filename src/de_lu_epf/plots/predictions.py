@@ -1,8 +1,8 @@
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import seaborn as sns
-from plotly.subplots import make_subplots
 
 
 def get_metric_name(metric):
@@ -104,7 +104,9 @@ def plot_residuals_interactive(actual_series, pred_df, title=None):
     return fig
 
 
-def plot_metric_barplot(actual_series, pred_df, metric, title=None, ascending=True):
+def plot_metric_barplot(
+    actual_series, pred_df, metric, title=None, ascending=True, figsize=(6, 4)
+):
     metric_name = get_metric_name(metric=metric)
 
     scores = []
@@ -113,9 +115,9 @@ def plot_metric_barplot(actual_series, pred_df, metric, title=None, ascending=Tr
         scores.append((model_name, score))
 
     df_scores = pd.DataFrame(scores, columns=["model", "score"])
-    df_scores = df_scores.sort_values("score", ascending=ascending)
+    df_scores = df_scores.sort_values("score", ascending=ascending).head(10)
 
-    fig, ax = plt.subplots(figsize=(6, 4))
+    fig, ax = plt.subplots(figsize=figsize)
 
     tableau_colors = plt.colormaps["tab10"].colors  # type: ignore
     colors = [tableau_colors[i % len(tableau_colors)] for i in range(len(df_scores))]
@@ -158,7 +160,14 @@ def plot_metric_barplot(actual_series, pred_df, metric, title=None, ascending=Tr
     return fig, ax
 
 
-def plot_residual_violinplot(actual_series, pred_df, title=None):
+def plot_residual_violinplot(actual_series, pred_df, title=None, figsize=(6, 4)):
+    mae_scores = {
+        col: np.mean(np.abs(actual_series - pred_df[col])) for col in pred_df.columns
+    }
+    top_models = pd.Series(mae_scores).sort_values(ascending=True).head(10).index
+
+    pred_df = pred_df[top_models]
+
     residual_df = (
         pred_df.sub(actual_series, axis=0)
         .astype("float64")
@@ -170,7 +179,7 @@ def plot_residual_violinplot(actual_series, pred_df, title=None):
         value_name="residual",
     )
 
-    fig, ax = plt.subplots(figsize=(6, 4))
+    fig, ax = plt.subplots(figsize=figsize)
 
     sns.violinplot(
         data=residual_df, x="model", y="residual", palette="tab10", hue="model", ax=ax
@@ -186,87 +195,33 @@ def plot_residual_violinplot(actual_series, pred_df, title=None):
     return fig, ax
 
 
-# def _format_imf_label(name):
-#     name_lower = name.lower()
-#     if "resid" in name_lower:
-#         return "Residual"
-#     if name_lower.startswith("imf"):
-#         suffix = name_lower.replace("imf", "")
-#         return f"IMF {suffix}" if suffix.isdigit() else name.upper()
-#     return name.upper()
+def plot_month_preds(month, year, actual_series, pred_df, title=None, figsize=(6, 4)):
+    mae_scores = {
+        col: np.mean(np.abs(actual_series - pred_df[col])) for col in pred_df.columns
+    }
+    top_models = pd.Series(mae_scores).sort_values(ascending=True).head(10).index
 
+    pred_df = pred_df[top_models]
+    pred_df = pred_df[
+        (pred_df.index.month == month) & (pred_df.index.year == year)
+    ].reset_index(names="datetime")
+    pred_df = pred_df.melt(
+        id_vars="datetime",
+        var_name="model",
+        value_name="forecast",
+    )
 
-# def plot_imf_predictions_interactive(pred_df, raw_df=None, title=None):
-#     pred_names = list(pred_df.columns)
-#     labels = [_format_imf_label(col) for col in pred_names]
+    fig, ax = plt.subplots(figsize=figsize)
 
-#     if raw_df is not None:
-#         raw_names = list(raw_df.columns)
-#         if raw_names != pred_names:
-#             raise ValueError(
-#                 "raw_df and pred_df must have the same columns in the same order"
-#             )
+    sns.lineplot(
+        data=pred_df, x=pred_df.index, y="forecast", hue="model", palette="tab10", ax=ax
+    )
 
-#     n_rows = len(pred_names)
+    ax.set_xlabel("Datetime")
+    ax.set_ylabel("Spot Price (EUR/MWHr)")
 
-#     fig = make_subplots(
-#         rows=n_rows,
-#         cols=1,
-#         shared_xaxes=True,
-#         vertical_spacing=0.02,
-#         subplot_titles=labels,
-#     )
+    if title is not None:
+        ax.set_title(title)
 
-#     for i, (col, label) in enumerate(zip(pred_names, labels), start=1):
-#         if raw_df is not None:
-#             fig.add_trace(
-#                 go.Scatter(
-#                     x=raw_df.index,
-#                     y=raw_df[col].values,
-#                     mode="lines",
-#                     name="Actual",
-#                     line=dict(color="black", width=1),
-#                     hovertemplate=f"Time: %{{x}}<br>{label} Actual: %{{y}}<extra></extra>",
-#                     showlegend=(i == 1),
-#                     legendgroup="actual",
-#                 ),
-#                 row=i,
-#                 col=1,
-#             )
-
-#         fig.add_trace(
-#             go.Scatter(
-#                 x=pred_df.index,
-#                 y=pred_df[col].values,
-#                 mode="lines",
-#                 name="Predicted" if raw_df is not None else label,
-#                 line=dict(width=1),
-#                 hovertemplate=(
-#                     f"Time: %{{x}}<br>{label} Predicted: %{{y}}<extra></extra>"
-#                     if raw_df is not None
-#                     else f"Time: %{{x}}<br>{label}: %{{y}}<extra></extra>"
-#                 ),
-#                 showlegend=(i == 1),
-#                 legendgroup="predicted",
-#             ),
-#             row=i,
-#             col=1,
-#         )
-
-#         fig.update_yaxes(title_text=label, row=i, col=1)
-
-#     fig.update_layout(
-#         title=title,
-#         template="plotly_white",
-#         hovermode="x unified",
-#         height=max(220 * n_rows, 400),
-#         xaxis_title="Datetime",
-#         legend=dict(
-#             itemclick="toggle",
-#             itemdoubleclick="toggleothers",
-#         ),
-#     )
-
-#     fig.update_xaxes(rangeslider_visible=True, row=n_rows, col=1)
-
-#     return fig
+    fig.tight_layout()
+    return fig, ax

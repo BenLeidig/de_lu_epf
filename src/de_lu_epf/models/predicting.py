@@ -259,7 +259,7 @@ def get_predictions_ann(model_name: str, model_class):
 
     test_idx = pd.date_range(
         start=test_start,
-        periods=len(test_pred_dict[[target_col]]),
+        periods=len(test_pred_dict[target_col]),
         freq="h",
     )
 
@@ -286,3 +286,22 @@ def get_predictions_ann(model_name: str, model_class):
     )
 
     return train_val_pred_df, test_pred_df
+
+
+def get_all_set_preds(set: str):
+
+    BASE_DIR = Path(__file__).parent.parent.parent.parent
+    DATA_DIR = BASE_DIR / "data"
+
+    concat_list = []
+
+    for dir in ["ann", "dmf", "hybrid"]:
+        PREDS_DIR = DATA_DIR / f"predictions/{set}/{dir}"
+
+        for f in PREDS_DIR.iterdir():
+            df = pd.read_parquet(f)
+            model_name = f.name.split("_")[0]
+            preds = df[["price"]].rename(columns={"price": model_name.upper()})  # type:ignore
+            concat_list.append(preds)
+
+    return pd.concat(concat_list, axis=1, join="inner")
