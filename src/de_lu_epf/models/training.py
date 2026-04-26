@@ -127,9 +127,10 @@ def get_fitted_ann(
         monitor="val_loss", patience=patience, mode="min"
     )
 
-    BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent.parent
+    BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
     dirpath = (
-        BASE_DIR / f"models/{model_type}/full/{model_name}/{target_col}_{model_name}.ckpt"
+        BASE_DIR
+        / f"models/{model_type}/full/{model_name}/{target_col}_{model_name}.ckpt"
         if model_type == "hybrid"
         else BASE_DIR / f"models/{model_type}/full/{model_name}"
     )
@@ -147,7 +148,7 @@ def get_fitted_ann(
     #### training ####
     ## making the dataset considering the batch_size
     datamodule = ANNDataModule(
-        data_dir=Path(__file__).resolve().parent.parent.parent.parent.parent
+        data_dir=Path(__file__).resolve().parent.parent.parent.parent
         / f"data/processed/{model_type}",
         batch_size=batch_size,
         target_col=target_col,
