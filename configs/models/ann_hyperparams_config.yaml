@@ -1,4 +1,4 @@
-lstm_mha:
+lstm-mha:
   batch_size: 58
   lr_init: 0.0001066714073553551
   hidden_size0: 96
@@ -16,7 +16,7 @@ lstm:
   hidden_size2: 165
   lstm_dropout0: 0.4725064213792077
   lstm_dropout1: 0.3423063216913109
-tcn_lstm_mha:
+tcn-lstm-mha:
   batch_size: 16
   lr_init: 0.003210135586752955
   kernel_size: 6
@@ -34,7 +34,7 @@ tcn_lstm_mha:
   lstm_dropout1: 0.051372064404654666
   mha_dropout: 0.19000447097027995
   mha_heads: 1
-tcn_lstm:
+tcn-lstm:
   batch_size: 28
   lr_init: 0.0002871480475870566
   kernel_size: 6
@@ -50,7 +50,7 @@ tcn_lstm:
   hidden_size2: 226
   lstm_dropout0: 0.46505919688428854
   lstm_dropout1: 0.030285949058268202
-tcn_mha:
+tcn-mha:
   batch_size: 45
   lr_init: 0.000342017741723615
   kernel_size: 2

@@ -12,11 +12,12 @@ if __name__ == "__main__":
     mods = ["lstm_mha", "lstm", "tcn_lstm_mha", "tcn_lstm", "tcn_mha", "tcn"]
 
     for mod_name in mods:
-        d[mod_name] = {}
+        mod_key = mod_name.replace("_", "-")
+        d[mod_key] = {}
 
         for mod_file in STUDY_DIR.rglob(f"{mod_name}.pkl"):
             best_params = load(mod_file).best_params
-            d[mod_name] = best_params
+            d[mod_key] = best_params
 
     with open(CFG_PATH, "w") as f:
         safe_dump(d, f, sort_keys=False)
