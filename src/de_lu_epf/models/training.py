@@ -129,14 +129,13 @@ def get_fitted_ann(
 
     BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
     dirpath = (
-        BASE_DIR
-        / f"models/{model_type}/full/{model_name}/{target_col}_{model_name}.ckpt"
+        BASE_DIR / f"models/{model_type}/full/{model_name}"
         if model_type == "hybrid"
-        else BASE_DIR / f"models/{model_type}/full/{model_name}"
+        else BASE_DIR / f"models/{model_type}/full"
     )
     ckpt_cb = pl.callbacks.ModelCheckpoint(  # type: ignore
         dirpath=dirpath,
-        filename="best",
+        filename=f"{target_col}_{model_name}",
         monitor="val_loss",
         mode="min",
         save_top_k=1,
