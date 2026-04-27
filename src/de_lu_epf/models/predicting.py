@@ -300,8 +300,10 @@ def get_all_set_preds(set: str):
 
         for f in PREDS_DIR.iterdir():
             df = pd.read_parquet(f)
-            model_name = f.name.split("_")[0]
-            preds = df[["price"]].rename(columns={"price": model_name.upper()})  # type:ignore
+            model_name = f.name.split(f"_{set}_")[0]
+            preds = df[["price"]].rename(
+                columns={"price": model_name.upper().replace("_", "-")}
+            )  # type:ignore
             concat_list.append(preds)
 
     return pd.concat(concat_list, axis=1, join="inner")

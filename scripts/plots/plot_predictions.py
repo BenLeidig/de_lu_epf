@@ -7,6 +7,7 @@ from de_lu_epf.models.predicting import get_all_set_preds
 from de_lu_epf.plots.predictions import (
     get_metric_name,
     plot_metric_barplot,
+    plot_month_preds,
     plot_predictions_interactive,
     plot_residual_violinplot,
     plot_residuals_interactive,
@@ -40,17 +41,31 @@ if __name__ == "__main__":
         fig, ax = plot_residual_violinplot(
             actual_series=actual_series,
             pred_df=df_preds,
-            title=f"Distribution of {set_name} Set Residuals",
+            title=None,
         )
         fig.savefig(SAVE_DIR / f"{set}_residual_distribution.svg")
 
-        for metric in [mean_absolute_error, r2_score, root_mean_squared_error]:
+        if set == "test":
+            fig, ax = plot_month_preds(
+                month=2, year=2024, actual_series=actual_series, pred_df=df_preds
+            )
+            fig.savefig(SAVE_DIR / f"{set}_feb_preds.svg")
+
+            fig, ax = plot_month_preds(
+                month=12, year=2024, actual_series=actual_series, pred_df=df_preds
+            )
+            fig.savefig(SAVE_DIR / f"{set}_dec_preds.svg")
+
+        for metric, ascending in zip(
+            [mean_absolute_error, r2_score, root_mean_squared_error],
+            [True, False, True],
+        ):
             metric_name = get_metric_name(metric=metric)
 
             fig, _ = plot_metric_barplot(
                 actual_series=actual_series,
                 pred_df=df_preds,
                 metric=metric,
-                title=f"{metric_name} on the {set_name} Set by Model",
+                title=None,
             )
             fig.savefig(SAVE_DIR / f"{set}_{metric.__name__}.svg")

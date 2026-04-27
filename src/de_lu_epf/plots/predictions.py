@@ -105,7 +105,7 @@ def plot_residuals_interactive(actual_series, pred_df, title=None):
 
 
 def plot_metric_barplot(
-    actual_series, pred_df, metric, title=None, ascending=True, figsize=(6, 4)
+    actual_series, pred_df, metric, title=None, ascending=False, figsize=(12, 8)
 ):
     metric_name = get_metric_name(metric=metric)
 
@@ -128,30 +128,51 @@ def plot_metric_barplot(
     y_max = max(0, df_scores["score"].max())
     y_range = y_max - y_min if y_max != y_min else 1
 
-    for bar, score in zip(bars, df_scores["score"]):
+    for bar, score, model_name in zip(
+        bars, df_scores["score"], df_scores["model"].unique()
+    ):
         height = bar.get_height()
         offset = 0.03 * y_range
 
         if height >= 0:
-            y = height - offset
-            va = "top"
+            y1 = height - offset
+            va1 = "top"
         else:
-            y = height + offset
-            va = "bottom"
+            y1 = height + offset
+            va1 = "bottom"
 
         ax.text(
             bar.get_x() + bar.get_width() / 2,
-            y,
-            f"{score:.3f}",
+            y1,
+            f"{score:.1f}",
             ha="center",
-            va=va,
+            va=va1,
             color="white",
-            fontsize=9,
+            fontsize=18,
             fontweight="bold",
         )
 
-    ax.set_xlabel("Model")
-    ax.set_ylabel(metric_name)
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            height // 2,
+            model_name,
+            ha="center",
+            va="center",
+            color="white",
+            fontsize=24,
+            fontweight="bold",
+            rotation=90,
+            rotation_mode="anchor",
+        )
+
+    ax.set_xticks([])
+
+    ax.tick_params(axis="y", labelsize=18)
+    for tick in ax.get_yticklabels():
+        tick.set_fontweight("bold")
+
+    ax.set_xlabel("Model", fontsize=18)
+    ax.set_ylabel(metric_name, fontsize=18, fontweight="bold")
 
     if title is not None:
         ax.set_title(title)
@@ -160,7 +181,7 @@ def plot_metric_barplot(
     return fig, ax
 
 
-def plot_residual_violinplot(actual_series, pred_df, title=None, figsize=(6, 4)):
+def plot_residual_violinplot(actual_series, pred_df, title=None, figsize=(12, 8)):
     mae_scores = {
         col: np.mean(np.abs(actual_series - pred_df[col])) for col in pred_df.columns
     }
@@ -185,8 +206,17 @@ def plot_residual_violinplot(actual_series, pred_df, title=None, figsize=(6, 4))
         data=residual_df, x="model", y="residual", palette="tab10", hue="model", ax=ax
     )
 
-    ax.set_xlabel("Model")
-    ax.set_ylabel("Residual")
+    ax.tick_params(axis="x", labelsize=18)
+    for tick in ax.get_xticklabels():
+        tick.set_fontweight("bold")
+    plt.setp(ax.get_xticklabels(), rotation=45, ha="right")
+
+    ax.tick_params(axis="y", labelsize=18)
+    for tick in ax.get_yticklabels():
+        tick.set_fontweight("bold")
+
+    ax.set_xlabel("")
+    ax.set_ylabel("Residuals", fontsize=18, fontweight="bold")
 
     if title is not None:
         ax.set_title(title)
@@ -195,30 +225,63 @@ def plot_residual_violinplot(actual_series, pred_df, title=None, figsize=(6, 4))
     return fig, ax
 
 
-def plot_month_preds(month, year, actual_series, pred_df, title=None, figsize=(6, 4)):
-    mae_scores = {
-        col: np.mean(np.abs(actual_series - pred_df[col])) for col in pred_df.columns
-    }
-    top_models = pd.Series(mae_scores).sort_values(ascending=True).head(10).index
+def plot_month_preds(month, year, actual_series, pred_df, title=None, figsize=(12, 8)):
+    # mae_scores = {
+    #     col: np.mean(np.abs(actual_series - pred_df[col])) for col in pred_df.columns
+    # }
+    # top_models = pd.Series(mae_scores).sort_values(ascending=True).head(10).index
+    top_models = ["VTLM"]
 
     pred_df = pred_df[top_models]
-    pred_df = pred_df[
-        (pred_df.index.month == month) & (pred_df.index.year == year)
-    ].reset_index(names="datetime")
+
+    mask = (pred_df.index.month == month) & (pred_df.index.year == year)
+
+    pred_df = pred_df[mask].reset_index(names="datetime")
+
     pred_df = pred_df.melt(
         id_vars="datetime",
-        var_name="model",
+        var_name="Model",
         value_name="forecast",
     )
 
     fig, ax = plt.subplots(figsize=figsize)
 
-    sns.lineplot(
-        data=pred_df, x=pred_df.index, y="forecast", hue="model", palette="tab10", ax=ax
+    ax.axhline(0, color="black", linewidth=0.7)
+
+    ax.plot(
+        actual_series[mask].index,
+        actual_series[mask].values,
+        label="Actual",
+        c="black",
+        linewidth=4,
     )
 
-    ax.set_xlabel("Datetime")
-    ax.set_ylabel("Spot Price (EUR/MWHr)")
+    ax.plot(
+        pred_df["datetime"], pred_df["forecast"], label="VTLM", c="tab:red", linewidth=4
+    )
+
+    # sns.lineplot(
+    #     data=pred_df,
+    #     x="datetime",
+    #     y="forecast",
+    #     hue="Model",
+    #     palette="tab10",
+    #     ax=ax,
+    #     linewidth=4,
+    # )
+
+    ax.tick_params(axis="x", labelsize=18)
+    for tick in ax.get_xticklabels():
+        tick.set_fontweight("bold")
+    plt.setp(ax.get_xticklabels(), rotation=45, ha="right")
+
+    ax.tick_params(axis="y", labelsize=18)
+    for tick in ax.get_yticklabels():
+        tick.set_fontweight("bold")
+
+    ax.legend(fontsize=18)
+    ax.set_xlabel("")
+    ax.set_ylabel("Spot Price (EUR/MWHr)", fontsize=18, fontweight="bold")
 
     if title is not None:
         ax.set_title(title)
