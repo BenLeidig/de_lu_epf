@@ -5,6 +5,11 @@ import numpy as np
 import ptitprince as pt
 from yaml import safe_load
 
+## Some utility code for scripted / notebook generation of visualizations.
+## Fairly straightfoward, so I don't believe many code comments are
+## necessary. It should be noted that some of these functions are
+## experimental and may not be used in the final repository code.
+
 
 def update_matplotlib_params():
     BASE_DIR = Path(__file__).parent.parent.parent.parent

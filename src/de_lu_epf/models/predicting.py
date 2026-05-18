@@ -10,6 +10,12 @@ from yaml import safe_load
 from de_lu_epf.data.loading import ANNDataModule
 from de_lu_epf.models.training import get_best_ann_params
 
+## NOTE: a lot of this code is fairly readable and straightforward.
+## Many code comments are not included hear for brevity and to improve
+## readability. It should be noted, however, that date handling (in
+## this source code) is set explicity for this research project.
+## Reach out to ben.leidig@gmail.com if you have any questions.
+
 
 def fetch_train_val_data(model_type: str):
     BASE_DIR = Path(__file__).parent.parent.parent.parent
