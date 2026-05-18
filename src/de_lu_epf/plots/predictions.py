@@ -291,16 +291,6 @@ def plot_month_preds(month, year, actual_series, pred_df, title=None, figsize=(1
         pred_df["datetime"], pred_df["forecast"], label="VTLM", c="tab:red", linewidth=4
     )
 
-    # sns.lineplot(
-    #     data=pred_df,
-    #     x="datetime",
-    #     y="forecast",
-    #     hue="Model",
-    #     palette="tab10",
-    #     ax=ax,
-    #     linewidth=4,
-    # )
-
     ax.tick_params(axis="x", labelsize=18)
     for tick in ax.get_xticklabels():
         tick.set_fontweight("bold")

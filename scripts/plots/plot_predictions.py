@@ -13,6 +13,10 @@ from de_lu_epf.plots.predictions import (
     plot_residuals_interactive,
 )
 
+## NOTE: here we are programmatically generating some exploratory
+## visualizations for each dataset (train / validation / test).
+## Please see src/de_lu_epf/plots/ for more code details.
+
 if __name__ == "__main__":
     BASE_DIR = Path(__file__).parent.parent.parent
     DATA_DIR = BASE_DIR / "data"
