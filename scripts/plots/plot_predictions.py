@@ -66,6 +66,7 @@ if __name__ == "__main__":
                 actual_series=actual_series,
                 pred_df=df_preds,
                 metric=metric,
+                ascending=ascending,
                 title=None,
             )
             fig.savefig(SAVE_DIR / f"{set}_{metric.__name__}.svg")

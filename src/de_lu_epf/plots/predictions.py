@@ -105,7 +105,13 @@ def plot_residuals_interactive(actual_series, pred_df, title=None):
 
 
 def plot_metric_barplot(
-    actual_series, pred_df, metric, title=None, ascending=False, figsize=(12, 8)
+    actual_series,
+    pred_df,
+    metric,
+    title=None,
+    ascending=False,
+    figsize=(12, 8),
+    inline_text: bool = True,
 ):
     metric_name = get_metric_name(metric=metric)
 
@@ -128,44 +134,69 @@ def plot_metric_barplot(
     y_max = max(0, df_scores["score"].max())
     y_range = y_max - y_min if y_max != y_min else 1
 
-    for bar, score, model_name in zip(
-        bars, df_scores["score"], df_scores["model"].unique()
-    ):
-        height = bar.get_height()
-        offset = 0.03 * y_range
+    if inline_text:
+        for bar, score, model_name in zip(
+            bars, df_scores["score"], df_scores["model"].unique()
+        ):
+            height = bar.get_height()
+            offset = 0.03 * y_range
 
-        if height >= 0:
-            y1 = height - offset
-            va1 = "top"
-        else:
-            y1 = height + offset
-            va1 = "bottom"
+            if height >= 0:
+                y1 = height - offset
+                va1 = "top"
+            else:
+                y1 = height + offset
+                va1 = "bottom"
 
-        ax.text(
-            bar.get_x() + bar.get_width() / 2,
-            y1,
-            f"{score:.1f}",
-            ha="center",
-            va=va1,
-            color="white",
-            fontsize=18,
-            fontweight="bold",
-        )
+            ax.text(
+                bar.get_x() + bar.get_width() / 2,
+                y1,
+                f"{score:.1f}",
+                ha="center",
+                va=va1,
+                color="white",
+                fontsize=18,
+                fontweight="bold",
+            )
 
-        ax.text(
-            bar.get_x() + bar.get_width() / 2,
-            height // 2,
-            model_name,
-            ha="center",
-            va="center",
-            color="white",
-            fontsize=24,
-            fontweight="bold",
-            rotation=90,
-            rotation_mode="anchor",
-        )
+            ax.text(
+                bar.get_x() + bar.get_width() / 2,
+                height // 2,
+                model_name,
+                ha="center",
+                va="center",
+                color="white",
+                fontsize=24,
+                fontweight="bold",
+                rotation=90,
+                rotation_mode="anchor",
+            )
+        ax.set_xticks([])
+    else:
+        for bar, score, model_name in zip(
+            bars, df_scores["score"], df_scores["model"].unique()
+        ):
+            height = bar.get_height()
+            offset = 0.03 * y_range
 
-    ax.set_xticks([])
+            if height >= 0:
+                y1 = height - offset
+                va1 = "top"
+            else:
+                y1 = height + offset
+                va1 = "bottom"
+
+            ax.text(
+                bar.get_x() + bar.get_width() / 2,
+                y1,
+                f"{score:.1f}",
+                ha="center",
+                va=va1,
+                color="white",
+                fontsize=18,
+                fontweight="bold",
+            )
+        ax.tick_params(axis="x", rotation=-45)
 
     ax.tick_params(axis="y", labelsize=18)
     for tick in ax.get_yticklabels():
