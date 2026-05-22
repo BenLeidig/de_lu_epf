@@ -8,7 +8,7 @@ This repository is the official implementation of *Evaluating hybrid deep learni
 
 Benjamin Leidig, Hyoeun Lee (mentor).
 
-Yihan Lin and Jaehyung Kim also contributed to an earlier version of this repository. Their work can be found under the `yihan_model_dev` and `jay_model_dev` folders, respectively.
+Yihan Lin and Jaehyung Kim also contributed to an earlier version of this repository. Their work can be found under the `yihan_model_dev` and `jay_model_dev` branches, respectively.
 
 
 ### Abstract
