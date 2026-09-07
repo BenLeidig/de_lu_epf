@@ -17,6 +17,14 @@ from de_lu_epf.models.training import get_best_ann_params
 ## Reach out to ben.leidig@gmail.com if you have any questions.
 
 
+def fetch_data(model_type: str, split: str):
+    BASE_DIR = Path(__file__).parent.parent.parent.parent
+    DATA_DIR = BASE_DIR / "data/processed"
+    df_scaled = pd.read_parquet(DATA_DIR / f"{model_type}/{split}_scaled.parquet")
+    df = pd.read_parquet(DATA_DIR / f"{model_type}/{split}.parquet")
+    return df_scaled, df
+
+
 def fetch_train_val_data(model_type: str):
     BASE_DIR = Path(__file__).parent.parent.parent.parent
     DATA_DIR = BASE_DIR / "data/processed"
@@ -25,14 +33,6 @@ def fetch_train_val_data(model_type: str):
     )
     df_train_val = pd.read_parquet(DATA_DIR / f"{model_type}/train_val.parquet")
     return df_train_val_scaled, df_train_val
-
-
-def fetch_test_data(model_type: str):
-    BASE_DIR = Path(__file__).parent.parent.parent.parent
-    DATA_DIR = BASE_DIR / "data/processed"
-    df_test_scaled = pd.read_parquet(DATA_DIR / f"{model_type}/test_scaled.parquet")
-    df_test = pd.read_parquet(DATA_DIR / f"{model_type}/test.parquet")
-    return df_test_scaled, df_test
 
 
 def fetch_features_targets(model_type: str):
@@ -64,24 +64,24 @@ def format_preds(preds, which: str):
         return np.asarray(preds).sum(axis=1)
 
 
-def get_predictions_dmf(model_name: str):
+def get_predictions_dmf(model_name: str, train_split: str, test_split: str):
     model_type = "dmf"
 
-    df_train_val_scaled, _ = fetch_train_val_data(model_type)
-    df_test_scaled, _ = fetch_test_data(model_type)
+    df_train_scaled, _ = fetch_data(model_type=model_type, split=train_split)
+    df_test_scaled, _ = fetch_data(model_type=model_type, split=test_split)
 
     features, _ = fetch_features_targets(model_type)
-    X_train_val_scaled = df_train_val_scaled[features]
+    X_train_scaled = df_train_scaled[features]
     X_test_scaled = df_test_scaled[features]
 
     dmf = fetch_fitted(model_type=model_type, model_name=model_name)
 
-    Y_train_val_pred = dmf.predict(X_train_val_scaled)
+    Y_train_pred = dmf.predict(X_train_scaled)
     Y_test_pred = dmf.predict(X_test_scaled)
 
     train_val_idx = pd.date_range(
-        start=df_train_val_scaled.index[0],
-        periods=Y_train_val_pred.shape[0] * Y_train_val_pred.shape[1],
+        start=X_train_scaled.index[0],
+        periods=Y_train_pred.shape[0] * Y_train_pred.shape[1],
         freq="h",
         tz="UTC",
     )
@@ -92,8 +92,8 @@ def get_predictions_dmf(model_name: str):
         tz="UTC",
     )
 
-    y_train_val_pred = pd.DataFrame(
-        data=format_preds(preds=Y_train_val_pred, which="dmf"),
+    y_train_pred = pd.DataFrame(
+        data=format_preds(preds=Y_train_pred, which="dmf"),
         columns=["price"],
         index=train_val_idx,
     )
@@ -103,10 +103,12 @@ def get_predictions_dmf(model_name: str):
         index=test_idx,
     )
 
-    return y_train_val_pred, y_test_pred
+    return y_train_pred, y_test_pred
 
 
-def get_predictions_hybrid(model_name: str, model_class):
+def get_predictions_hybrid(
+    model_name: str, model_class, train_split: str, test_split: str
+):
 
     BASE_DIR = Path(__file__).parent.parent.parent.parent
     DATA_DIR = BASE_DIR / "data/processed/hybrid"
@@ -117,7 +119,7 @@ def get_predictions_hybrid(model_name: str, model_class):
         dt_range_cfg = safe_load(f)["dt_range"]
 
     seq_len = 24 * 7 * 2
-    train_val_pred_dict = {}
+    train_pred_dict = {}
     test_pred_dict = {}
     targets = ["imf1", "imf2", "imf3", "imf4", "imf5", "imf_resid"]
     for target_col in targets:
@@ -129,8 +131,28 @@ def get_predictions_hybrid(model_name: str, model_class):
             data_dir=DATA_DIR, batch_size=batch_size, target_col=target_col
         )
         datamodule.setup()
-        train_val_dataloader = datamodule.train_val_dataloader()
-        test_dataloader = datamodule.test_dataloader()
+        train_dataloader = (
+            datamodule.train_dataloader()
+            if train_split.lower() == "train"
+            else datamodule.val_dataloader()
+            if train_split.lower() == "val"
+            else datamodule.test_dataloader()
+            if train_split.lower() == "test"
+            else datamodule.train_val_dataloader()
+            if train_split.lower() == "train_val"
+            else None
+        )
+        test_dataloader = (
+            datamodule.train_dataloader()
+            if test_split.lower() == "train"
+            else datamodule.val_dataloader()
+            if test_split.lower() == "val"
+            else datamodule.test_dataloader()
+            if test_split.lower() == "test"
+            else datamodule.train_val_dataloader()
+            if test_split.lower() == "train_val"
+            else None
+        )
 
         model = model_class.load_from_checkpoint(
             MODEL_DIR / f"{model_name}/{target_col}_{model_name}.ckpt",
@@ -145,9 +167,9 @@ def get_predictions_hybrid(model_name: str, model_class):
             enable_checkpointing=False,
         )
 
-        y_train_val_pred = trainer.predict(model, dataloaders=train_val_dataloader)
-        train_val_pred_dict[target_col] = (
-            torch.cat(y_train_val_pred, dim=0).detach().cpu().numpy().reshape(-1)  # type: ignore
+        y_train_pred = trainer.predict(model, dataloaders=train_dataloader)
+        train_pred_dict[target_col] = (
+            torch.cat(y_train_pred, dim=0).detach().cpu().numpy().reshape(-1)  # type: ignore
         )
 
         y_test_pred = trainer.predict(model, dataloaders=test_dataloader)
@@ -155,7 +177,7 @@ def get_predictions_hybrid(model_name: str, model_class):
             torch.cat(y_test_pred, dim=0).detach().cpu().numpy().reshape(-1)  # type: ignore
         )
 
-    train_val_start = pd.to_datetime(
+    train_start = pd.to_datetime(
         dt_range_cfg["train"]["start"], utc=True
     ) + pd.Timedelta(seq_len, "h")
     test_start = pd.to_datetime(dt_range_cfg["test"]["start"], utc=True) + pd.Timedelta(
@@ -163,8 +185,8 @@ def get_predictions_hybrid(model_name: str, model_class):
     )
 
     train_val_idx = pd.date_range(
-        start=train_val_start,
-        periods=len(train_val_pred_dict["imf1"]),
+        start=train_start,
+        periods=len(train_pred_dict["imf1"]),
         freq="h",
     )
 
@@ -174,10 +196,10 @@ def get_predictions_hybrid(model_name: str, model_class):
         freq="h",
     )
 
-    train_val_pred_df = pd.DataFrame(train_val_pred_dict)
-    train_val_pred_df["datetime"] = train_val_idx
-    train_val_pred_df = train_val_pred_df.set_index("datetime")
-    train_val_pred_df = train_val_pred_df[train_val_pred_df.index.year < 2024]
+    train_pred_df = pd.DataFrame(train_pred_dict)
+    train_pred_df["datetime"] = train_val_idx
+    train_pred_df = train_pred_df.set_index("datetime")
+    train_pred_df = train_pred_df[train_pred_df.index.year < 2024]
 
     test_pred_df = pd.DataFrame(test_pred_dict)
     test_pred_df["datetime"] = test_idx
@@ -185,10 +207,10 @@ def get_predictions_hybrid(model_name: str, model_class):
     test_pred_df = test_pred_df[test_pred_df.index.year == 2024]
 
     _, target_scaler = fetch_full_scalers(model_type="hybrid")
-    train_val_pred_df = pd.DataFrame(
-        data=target_scaler.inverse_transform(train_val_pred_df),
-        columns=train_val_pred_df.columns,
-        index=train_val_pred_df.index,
+    train_pred_df = pd.DataFrame(
+        data=target_scaler.inverse_transform(train_pred_df),
+        columns=train_pred_df.columns,
+        index=train_pred_df.index,
     )
     test_pred_df = pd.DataFrame(
         data=target_scaler.inverse_transform(test_pred_df),
@@ -196,13 +218,15 @@ def get_predictions_hybrid(model_name: str, model_class):
         index=test_pred_df.index,
     )
 
-    train_val_pred_df["price"] = train_val_pred_df.sum(axis=1)
+    train_pred_df["price"] = train_pred_df.sum(axis=1)
     test_pred_df["price"] = test_pred_df.sum(axis=1)
 
-    return train_val_pred_df, test_pred_df
+    return train_pred_df, test_pred_df
 
 
-def get_predictions_ann(model_name: str, model_class):
+def get_predictions_ann(
+    model_name: str, model_class, train_split: str, test_split: str
+):
 
     BASE_DIR = Path(__file__).parent.parent.parent.parent
     DATA_DIR = BASE_DIR / "data/processed/ann"
@@ -214,7 +238,7 @@ def get_predictions_ann(model_name: str, model_class):
 
     seq_len = 24 * 7 * 2
     target_col = "price"
-    train_val_pred_dict = {}
+    train_pred_dict = {}
     test_pred_dict = {}
     batch_size, params = get_best_ann_params(
         target_col=target_col, model_name=model_name, model_type="ann"
@@ -224,8 +248,28 @@ def get_predictions_ann(model_name: str, model_class):
         data_dir=DATA_DIR, batch_size=batch_size, target_col=target_col
     )
     datamodule.setup()
-    train_val_dataloader = datamodule.train_val_dataloader()
-    test_dataloader = datamodule.test_dataloader()
+    train_dataloader = (
+        datamodule.train_dataloader()
+        if train_split.lower() == "train"
+        else datamodule.val_dataloader()
+        if train_split.lower() == "val"
+        else datamodule.test_dataloader()
+        if train_split.lower() == "test"
+        else datamodule.train_val_dataloader()
+        if train_split.lower() == "train_val"
+        else None
+    )
+    test_dataloader = (
+        datamodule.train_dataloader()
+        if test_split.lower() == "train"
+        else datamodule.val_dataloader()
+        if test_split.lower() == "val"
+        else datamodule.test_dataloader()
+        if test_split.lower() == "test"
+        else datamodule.train_val_dataloader()
+        if test_split.lower() == "train_val"
+        else None
+    )
 
     model = model_class.load_from_checkpoint(
         MODEL_DIR / f"{model_name}.ckpt",
@@ -240,9 +284,9 @@ def get_predictions_ann(model_name: str, model_class):
         enable_checkpointing=False,
     )
 
-    y_train_val_pred = trainer.predict(model, dataloaders=train_val_dataloader)
-    train_val_pred_dict[target_col] = (
-        torch.cat(y_train_val_pred, dim=0).detach().cpu().numpy().reshape(-1)  # type: ignore
+    y_train_pred = trainer.predict(model, dataloaders=train_dataloader)
+    train_pred_dict[target_col] = (
+        torch.cat(y_train_pred, dim=0).detach().cpu().numpy().reshape(-1)  # type: ignore
     )
 
     y_test_pred = trainer.predict(model, dataloaders=test_dataloader)
@@ -250,16 +294,16 @@ def get_predictions_ann(model_name: str, model_class):
         torch.cat(y_test_pred, dim=0).detach().cpu().numpy().reshape(-1)  # type: ignore
     )
 
-    train_val_start = pd.to_datetime(
+    train_start = pd.to_datetime(
         dt_range_cfg["train"]["start"], utc=True
     ) + pd.Timedelta(seq_len, "h")
     test_start = pd.to_datetime(dt_range_cfg["test"]["start"], utc=True) + pd.Timedelta(
         seq_len, "h"
     )
 
-    train_val_idx = pd.date_range(
-        start=train_val_start,
-        periods=len(train_val_pred_dict[target_col]),
+    train_idx = pd.date_range(
+        start=train_start,
+        periods=len(train_pred_dict[target_col]),
         freq="h",
     )
 
@@ -269,10 +313,10 @@ def get_predictions_ann(model_name: str, model_class):
         freq="h",
     )
 
-    train_val_pred_df = pd.DataFrame(train_val_pred_dict)
-    train_val_pred_df["datetime"] = train_val_idx
-    train_val_pred_df = train_val_pred_df.set_index("datetime")
-    train_val_pred_df = train_val_pred_df[train_val_pred_df.index.year < 2024]
+    train_pred_df = pd.DataFrame(train_pred_dict)
+    train_pred_df["datetime"] = train_idx
+    train_pred_df = train_pred_df.set_index("datetime")
+    train_pred_df = train_pred_df[train_pred_df.index.year < 2024]
 
     test_pred_df = pd.DataFrame(test_pred_dict)
     test_pred_df["datetime"] = test_idx
@@ -280,10 +324,10 @@ def get_predictions_ann(model_name: str, model_class):
     test_pred_df = test_pred_df[test_pred_df.index.year == 2024]
 
     _, target_scaler = fetch_full_scalers(model_type="ann")
-    train_val_pred_df = pd.DataFrame(
-        data=target_scaler.inverse_transform(train_val_pred_df),
-        columns=train_val_pred_df.columns,
-        index=train_val_pred_df.index,
+    train_pred_df = pd.DataFrame(
+        data=target_scaler.inverse_transform(train_pred_df),
+        columns=train_pred_df.columns,
+        index=train_pred_df.index,
     )
     test_pred_df = pd.DataFrame(
         data=target_scaler.inverse_transform(test_pred_df),
@@ -291,7 +335,7 @@ def get_predictions_ann(model_name: str, model_class):
         index=test_pred_df.index,
     )
 
-    return train_val_pred_df, test_pred_df
+    return train_pred_df, test_pred_df
 
 
 def get_all_set_preds(set: str):
