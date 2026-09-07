@@ -18,6 +18,16 @@ from de_lu_epf.models.training import get_best_ann_params
 
 
 def fetch_data(model_type: str, split: str):
+    """Fetch the scaled and unscaled data for a given model type and split.
+
+    Args:
+        model_type (str): The type of model (e.g., "dmf", "hybrid").
+        split (str): The data split to fetch (e.g., "train", "test").
+
+    Returns:
+        Tuple[pd.DataFrame, pd.DataFrame]: A tuple containing the scaled and unscaled dataframes.
+    """
+
     BASE_DIR = Path(__file__).parent.parent.parent.parent
     DATA_DIR = BASE_DIR / "data/processed"
     df_scaled = pd.read_parquet(DATA_DIR / f"{model_type}/{split}_scaled.parquet")
@@ -25,17 +35,16 @@ def fetch_data(model_type: str, split: str):
     return df_scaled, df
 
 
-def fetch_train_val_data(model_type: str):
-    BASE_DIR = Path(__file__).parent.parent.parent.parent
-    DATA_DIR = BASE_DIR / "data/processed"
-    df_train_val_scaled = pd.read_parquet(
-        DATA_DIR / f"{model_type}/train_val_scaled.parquet"
-    )
-    df_train_val = pd.read_parquet(DATA_DIR / f"{model_type}/train_val.parquet")
-    return df_train_val_scaled, df_train_val
-
-
 def fetch_features_targets(model_type: str):
+    """Fetch the features and targets for a given model type from the preprocessing configuration.
+
+    Args:
+        model_type (str): The type of model (e.g., "dmf", "hybrid").
+
+    Returns:
+        Tuple[list, list]: A tuple containing the list of feature column names and the list of target column names.
+    """
+
     BASE_DIR = Path(__file__).parent.parent.parent.parent
     CFG_DIR = BASE_DIR / "configs/models"
     with open(CFG_DIR / "preprocess_config.yaml") as f:
@@ -44,12 +53,29 @@ def fetch_features_targets(model_type: str):
 
 
 def fetch_fitted(model_type: str, model_name: str):
+    """Fetch a fitted model for a given model type and model name.
+
+    Args:
+        model_type (str): The type of model (e.g., "dmf", "hybrid").
+        model_name (str): The name of the fitted model file (without the .pkl extension).
+
+    Returns:
+        Any: The fitted model object loaded from the corresponding .pkl file.
+    """
     BASE_DIR = Path(__file__).parent.parent.parent.parent
     MODEL_DIR = BASE_DIR / f"models/{model_type}/full"
     return load(MODEL_DIR / f"{model_name}.pkl")
 
 
 def fetch_full_scalers(model_type: str):
+    """Fetch the full feature and target scalers for a given model type.
+
+    Args:
+        model_type (str): The type of model (e.g., "dmf", "hybrid").
+
+    Returns:
+        Tuple[Any, Any]: A tuple containing the feature scaler and target scaler objects.
+    """
     BASE_DIR = Path(__file__).parent.parent.parent.parent
     MODEL_DIR = BASE_DIR / f"models/{model_type}/full"
     feature_scaler = load(MODEL_DIR / "feature_scaler.pkl")
@@ -58,6 +84,15 @@ def fetch_full_scalers(model_type: str):
 
 
 def format_preds(preds, which: str):
+    """Format predictions based on the model type.
+
+    Args:
+        preds (np.ndarray): The raw predictions from the model.
+        which (str): The type of model ("dmf" or "hybrid").
+
+    Returns:
+        np.ndarray: The formatted predictions as a 1D array.
+    """
     if which == "dmf":
         return np.asarray(preds).flatten()
     elif which == "hybrid":
@@ -65,6 +100,16 @@ def format_preds(preds, which: str):
 
 
 def get_predictions_dmf(model_name: str, train_split: str, test_split: str):
+    """Get predictions for a DMF model.
+
+    Args:
+        model_name (str): The name of the fitted DMF model file (without the .pkl extension).
+        train_split (str): The name of the training data split.
+        test_split (str): The name of the testing data split.
+
+    Returns:
+        Tuple[pd.DataFrame, pd.DataFrame]: A tuple containing the training and testing predictions as DataFrames.
+    """
     model_type = "dmf"
 
     df_train_scaled, _ = fetch_data(model_type=model_type, split=train_split)
@@ -109,6 +154,17 @@ def get_predictions_dmf(model_name: str, train_split: str, test_split: str):
 def get_predictions_hybrid(
     model_name: str, model_class, train_split: str, test_split: str
 ):
+    """Get predictions for a hybrid model.
+
+    Args:
+        model_name (str): The name of the fitted hybrid model file (without the .ckpt extension).
+        model_class (_type_): The class of the hybrid model.
+        train_split (str): The name of the training data split.
+        test_split (str): The name of the testing data split.
+
+    Returns:
+        Tuple[np.ndarray, np.ndarray]: A tuple containing the training and testing predictions as NumPy arrays.
+    """
 
     BASE_DIR = Path(__file__).parent.parent.parent.parent
     DATA_DIR = BASE_DIR / "data/processed/hybrid"
@@ -227,6 +283,17 @@ def get_predictions_hybrid(
 def get_predictions_ann(
     model_name: str, model_class, train_split: str, test_split: str
 ):
+    """Get predictions for an ANN model.
+
+    Args:
+        model_name (str): The name of the fitted ANN model file (without the .ckpt extension).
+        model_class (_type_): The class of the ANN model.
+        train_split (str): The name of the training data split.
+        test_split (str): The name of the testing data split.
+
+    Returns:
+        Tuple[pd.DataFrame, pd.DataFrame]: A tuple containing the training and testing predictions as DataFrames.
+    """
 
     BASE_DIR = Path(__file__).parent.parent.parent.parent
     DATA_DIR = BASE_DIR / "data/processed/ann"
@@ -339,6 +406,14 @@ def get_predictions_ann(
 
 
 def get_all_set_preds(set: str):
+    """Get all predictions for a given dataset split.
+
+    Args:
+        set (str): The name of the dataset split (e.g., "train" or "test").
+
+    Returns:
+        pd.DataFrame: A DataFrame containing all model predictions for the specified dataset split.
+    """
 
     BASE_DIR = Path(__file__).parent.parent.parent.parent
     DATA_DIR = BASE_DIR / "data"
