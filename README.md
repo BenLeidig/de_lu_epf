@@ -1,4 +1,4 @@
-# Evaluating hybrid deep learning architectures for day-ahead electricity price forecasting in the german spot market
+# Evaluating hybrid deep learning architectures for day-ahead electricity price forecasting in the German spot market
 
 This repository is the official implementation of *Evaluating hybrid deep learning architectures for day-ahead electricity price forecasting in the german spot market*.
 
