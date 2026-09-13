@@ -1,4 +1,5 @@
 import gc
+import shutil
 from pathlib import Path
 
 import lightning.pytorch as pl
@@ -17,6 +18,104 @@ from de_lu_epf.models.architectures import (
 )
 
 
+def _fit_and_checkpoint(
+    trial: optuna.trial.Trial,
+    mod: pl.LightningModule,
+    datamodule: ANNDataModule,
+    patience: int,
+    max_epochs: int,
+    accelerator: str,
+    checkpoint_path: Path,
+) -> float:
+    """Fit one HPO trial, and persist its best-epoch weights as the new
+    best-so-far checkpoint for this study, if this trial improves on every
+    trial completed before it.
+
+    This lets HPO's own winning trial be used directly as the "candidate"
+    model for cross-architecture comparison (see select_final_model.py),
+    instead of a separate script re-fitting the winning hyperparameters
+    from scratch afterward.
+
+    Every trial writes to the same scratch directory, cleared at the end of
+    each trial. (Lightning's ModelCheckpoint auto-versions the filename -
+    "scratch-v1.ckpt", "-v2.ckpt", etc. - if a file already exists at that
+    path when a new Trainer starts, rather than overwriting it, so simply
+    reusing a fixed path is not enough on its own; the directory has to be
+    emptied explicitly between trials.) This keeps a long search from
+    accumulating leftover checkpoint files from trials that didn't win, or
+    were pruned partway through.
+
+    Returns:
+        float: This trial's *best*-epoch val_loss (what the checkpoint, if
+            kept, actually achieves) - not the last-epoch val_loss, which
+            early stopping's patience window typically leaves worse.
+    """
+    tmp_dir = checkpoint_path.parent / ".tmp" / checkpoint_path.stem
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+
+    ckpt_cb = pl.callbacks.ModelCheckpoint(  # type: ignore
+        dirpath=tmp_dir,
+        filename="scratch",
+        monitor="val_loss",
+        mode="min",
+        save_top_k=1,
+        save_last=False,
+    )
+    callbacks = [
+        pl.callbacks.EarlyStopping(  # type: ignore
+            monitor="val_loss", patience=patience, mode="min"
+        ),
+        optuna.integration.PyTorchLightningPruningCallback(trial, monitor="val_loss"),
+        ckpt_cb,
+    ]
+
+    trainer = pl.Trainer(  ## instantiating the trainer given the model and callbacks
+        max_epochs=max_epochs,
+        callbacks=callbacks,
+        accelerator=accelerator,
+        logger=False,
+        enable_checkpointing=True,
+        gradient_clip_val=1.0,
+        gradient_clip_algorithm="norm",
+    )
+    try:
+        trainer.fit(mod, datamodule=datamodule)  ## fitting the trainer
+        # trainer.fit() raises optuna.TrialPruned() from inside the pruning
+        # callback for a pruned trial, so nothing below this line runs for
+        # one - which is correct: a pruned trial should never be compared
+        # against/promoted over the best completed trial so far. The
+        # `finally` block below still runs the scratch-directory cleanup
+        # either way.
+
+        # The checkpoint's own best score, not trainer.callback_metrics
+        # ["val_loss"] (which reflects the LAST epoch trained - typically
+        # several epochs worse than the best one, due to early stopping's
+        # patience window).
+        val_loss = ckpt_cb.best_model_score.item()  ## finding the loss
+
+        try:
+            is_best = val_loss < trial.study.best_value
+        except ValueError:  # no trial has completed yet - this one is best by default
+            is_best = True
+
+        if is_best and ckpt_cb.best_model_path:
+            checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(ckpt_cb.best_model_path, checkpoint_path)
+    finally:
+        # Always clear the scratch directory - completed, pruned, or errored
+        # - so the next trial starts from a clean slate and reuses the plain
+        # "scratch.ckpt" name, rather than Lightning auto-versioning around
+        # whatever this trial left behind.
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+
+        del trainer, mod, datamodule
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        gc.collect()
+
+    return val_loss  ## report the loss
+
+
 def tune_tcn_lstm_mha(
     target_col: str,
     model_type: str,
@@ -30,6 +129,7 @@ def tune_tcn_lstm_mha(
     lstm_dropouts_range: list,
     mha_dropout_range: list,
     mha_heads_range: list,
+    checkpoint_path: Path,
     patience: int = 5,
     max_epochs: int = 50,
     reduction_factor: int = 3,
@@ -108,16 +208,6 @@ def tune_tcn_lstm_mha(
         if hidden_sizes[-1] % mha_heads != 0:  # type: ignore
             raise optuna.TrialPruned()
 
-        #### callbacks ####
-        callbacks = [
-            pl.callbacks.EarlyStopping(  # type: ignore
-                monitor="val_loss", patience=patience, mode="min"
-            ),
-            optuna.integration.PyTorchLightningPruningCallback(
-                trial, monitor="val_loss"
-            ),
-        ]
-
         #### training ####
         ## making the dataset considering the batch_size
         datamodule = ANNDataModule(
@@ -144,26 +234,9 @@ def tune_tcn_lstm_mha(
             lr_init=lr_init,
         )
 
-        trainer = (
-            pl.Trainer(  ## instantiating the trainer given the model and callbacks
-                max_epochs=max_epochs,
-                callbacks=callbacks,
-                accelerator=accelerator,
-                logger=False,
-                enable_checkpointing=False,
-                gradient_clip_val=1.0,
-                gradient_clip_algorithm="norm",
-            )
+        return _fit_and_checkpoint(
+            trial, mod, datamodule, patience, max_epochs, accelerator, checkpoint_path
         )
-        trainer.fit(mod, datamodule=datamodule)  ## fitting the trainer
-        val_loss = trainer.callback_metrics["val_loss"].item()  ## finding the loss
-
-        del trainer, mod, datamodule
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-        gc.collect()
-
-        return val_loss  ## report the loss
 
     sampler = optuna.samplers.TPESampler(seed=random_state)
     pruner = optuna.pruners.HyperbandPruner(
@@ -188,6 +261,7 @@ def tune_tcn_lstm(
     kernel_size_range: list,
     tcn_dropout_range: list,
     lstm_dropouts_range: list,
+    checkpoint_path: Path,
     patience: int = 5,
     max_epochs: int = 50,
     reduction_factor: int = 3,
@@ -256,16 +330,6 @@ def tune_tcn_lstm(
         )
         lstm_dropouts = [lstm_dropout0, lstm_dropout1]
 
-        #### callbacks ####
-        callbacks = [
-            pl.callbacks.EarlyStopping(  # type: ignore
-                monitor="val_loss", patience=patience, mode="min"
-            ),
-            optuna.integration.PyTorchLightningPruningCallback(
-                trial, monitor="val_loss"
-            ),
-        ]
-
         #### training ####
         ## making the dataset considering the batch_size
         datamodule = ANNDataModule(
@@ -290,26 +354,9 @@ def tune_tcn_lstm(
             lr_init=lr_init,
         )
 
-        trainer = (
-            pl.Trainer(  ## instantiating the trainer given the model and callbacks
-                max_epochs=max_epochs,
-                callbacks=callbacks,
-                accelerator=accelerator,
-                logger=False,
-                enable_checkpointing=False,
-                gradient_clip_val=1.0,
-                gradient_clip_algorithm="norm",
-            )
+        return _fit_and_checkpoint(
+            trial, mod, datamodule, patience, max_epochs, accelerator, checkpoint_path
         )
-        trainer.fit(mod, datamodule=datamodule)  ## fitting the trainer
-        val_loss = trainer.callback_metrics["val_loss"].item()  ## finding the loss
-
-        del trainer, mod, datamodule
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-        gc.collect()
-
-        return val_loss  ## report the loss
 
     sampler = optuna.samplers.TPESampler(seed=random_state)
     pruner = optuna.pruners.HyperbandPruner(
@@ -335,6 +382,7 @@ def tune_tcn_mha(
     tcn_dropout_range: list,
     mha_dropout_range: list,
     mha_heads_range: list,
+    checkpoint_path: Path,
     patience: int = 5,
     max_epochs: int = 50,
     reduction_factor: int = 3,
@@ -389,16 +437,6 @@ def tune_tcn_mha(
         if channel_sizes[-1] % mha_heads != 0:  # type: ignore
             raise optuna.TrialPruned()
 
-        #### callbacks ####
-        callbacks = [
-            pl.callbacks.EarlyStopping(  # type: ignore
-                monitor="val_loss", patience=patience, mode="min"
-            ),
-            optuna.integration.PyTorchLightningPruningCallback(
-                trial, monitor="val_loss"
-            ),
-        ]
-
         #### training ####
         ## making the dataset considering the batch_size
         datamodule = ANNDataModule(
@@ -423,26 +461,9 @@ def tune_tcn_mha(
             lr_init=lr_init,
         )
 
-        trainer = (
-            pl.Trainer(  ## instantiating the trainer given the model and callbacks
-                max_epochs=max_epochs,
-                callbacks=callbacks,
-                accelerator=accelerator,
-                logger=False,
-                enable_checkpointing=False,
-                gradient_clip_val=1.0,
-                gradient_clip_algorithm="norm",
-            )
+        return _fit_and_checkpoint(
+            trial, mod, datamodule, patience, max_epochs, accelerator, checkpoint_path
         )
-        trainer.fit(mod, datamodule=datamodule)  ## fitting the trainer
-        val_loss = trainer.callback_metrics["val_loss"].item()  ## finding the loss
-
-        del trainer, mod, datamodule
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-        gc.collect()
-
-        return val_loss  ## report the loss
 
     sampler = optuna.samplers.TPESampler(seed=random_state)
     pruner = optuna.pruners.HyperbandPruner(
@@ -466,6 +487,7 @@ def tune_tcn(
     lr_init_range: list,
     kernel_size_range: list,
     tcn_dropout_range: list,
+    checkpoint_path: Path,
     patience: int = 5,
     max_epochs: int = 50,
     reduction_factor: int = 3,
@@ -510,16 +532,6 @@ def tune_tcn(
             "tcn_dropout", float(tcn_dropout_range[0]), float(tcn_dropout_range[1])
         )
 
-        #### callbacks ####
-        callbacks = [
-            pl.callbacks.EarlyStopping(  # type: ignore
-                monitor="val_loss", patience=patience, mode="min"
-            ),
-            optuna.integration.PyTorchLightningPruningCallback(
-                trial, monitor="val_loss"
-            ),
-        ]
-
         #### training ####
         ## making the dataset considering the batch_size
         datamodule = ANNDataModule(
@@ -542,26 +554,9 @@ def tune_tcn(
             lr_init=lr_init,
         )
 
-        trainer = (
-            pl.Trainer(  ## instantiating the trainer given the model and callbacks
-                max_epochs=max_epochs,
-                callbacks=callbacks,
-                accelerator=accelerator,
-                logger=False,
-                enable_checkpointing=False,
-                gradient_clip_val=1.0,
-                gradient_clip_algorithm="norm",
-            )
+        return _fit_and_checkpoint(
+            trial, mod, datamodule, patience, max_epochs, accelerator, checkpoint_path
         )
-        trainer.fit(mod, datamodule=datamodule)  ## fitting the trainer
-        val_loss = trainer.callback_metrics["val_loss"].item()  ## finding the loss
-
-        del trainer, mod, datamodule
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-        gc.collect()
-
-        return val_loss  ## report the loss
 
     sampler = optuna.samplers.TPESampler(seed=random_state)
     pruner = optuna.pruners.HyperbandPruner(
@@ -584,6 +579,7 @@ def tune_lstm(
     batch_size_range: list,
     lr_init_range: list,
     lstm_dropouts_range: list,
+    checkpoint_path: Path,
     patience: int = 5,
     max_epochs: int = 50,
     reduction_factor: int = 3,
@@ -621,16 +617,6 @@ def tune_lstm(
         )
         lstm_dropouts = [lstm_dropout0, lstm_dropout1]
 
-        #### callbacks ####
-        callbacks = [
-            pl.callbacks.EarlyStopping(  # type: ignore
-                monitor="val_loss", patience=patience, mode="min"
-            ),
-            optuna.integration.PyTorchLightningPruningCallback(
-                trial, monitor="val_loss"
-            ),
-        ]
-
         #### training ####
         ## making the dataset considering the batch_size
         datamodule = ANNDataModule(
@@ -652,26 +638,9 @@ def tune_lstm(
             lr_init=lr_init,
         )
 
-        trainer = (
-            pl.Trainer(  ## instantiating the trainer given the model and callbacks
-                max_epochs=max_epochs,
-                callbacks=callbacks,
-                accelerator=accelerator,
-                logger=False,
-                enable_checkpointing=False,
-                gradient_clip_val=1.0,
-                gradient_clip_algorithm="norm",
-            )
+        return _fit_and_checkpoint(
+            trial, mod, datamodule, patience, max_epochs, accelerator, checkpoint_path
         )
-        trainer.fit(mod, datamodule=datamodule)  ## fitting the trainer
-        val_loss = trainer.callback_metrics["val_loss"].item()  ## finding the loss
-
-        del trainer, mod, datamodule
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-        gc.collect()
-
-        return val_loss  ## report the loss
 
     sampler = optuna.samplers.TPESampler(seed=random_state)
     pruner = optuna.pruners.HyperbandPruner(
@@ -696,6 +665,7 @@ def tune_lstm_mha(
     lstm_dropouts_range: list,
     mha_dropout_range: list,
     mha_heads_range: list,
+    checkpoint_path: Path,
     patience: int = 5,
     max_epochs: int = 50,
     reduction_factor: int = 3,
@@ -743,16 +713,6 @@ def tune_lstm_mha(
         if hidden_sizes[-1] % mha_heads != 0:  # type: ignore
             raise optuna.TrialPruned()
 
-        #### callbacks ####
-        callbacks = [
-            pl.callbacks.EarlyStopping(  # type: ignore
-                monitor="val_loss", patience=patience, mode="min"
-            ),
-            optuna.integration.PyTorchLightningPruningCallback(
-                trial, monitor="val_loss"
-            ),
-        ]
-
         #### training ####
         ## making the dataset considering the batch_size
         datamodule = ANNDataModule(
@@ -776,26 +736,9 @@ def tune_lstm_mha(
             lr_init=lr_init,
         )
 
-        trainer = (
-            pl.Trainer(  ## instantiating the trainer given the model and callbacks
-                max_epochs=max_epochs,
-                callbacks=callbacks,
-                accelerator=accelerator,
-                logger=False,
-                enable_checkpointing=False,
-                gradient_clip_val=1.0,
-                gradient_clip_algorithm="norm",
-            )
+        return _fit_and_checkpoint(
+            trial, mod, datamodule, patience, max_epochs, accelerator, checkpoint_path
         )
-        trainer.fit(mod, datamodule=datamodule)  ## fitting the trainer
-        val_loss = trainer.callback_metrics["val_loss"].item()  ## finding the loss
-
-        del trainer, mod, datamodule
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-        gc.collect()
-
-        return val_loss  ## report the loss
 
     sampler = optuna.samplers.TPESampler(seed=random_state)
     pruner = optuna.pruners.HyperbandPruner(

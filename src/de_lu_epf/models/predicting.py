@@ -16,6 +16,30 @@ from de_lu_epf.models.training import get_best_ann_params
 ## this source code) is set explicity for this research project.
 ## Reach out to ben.leidig@gmail.com if you have any questions.
 
+# Maps a physical split name to the `dt_range` key in process_config.yaml
+# that its data actually starts at ("train_val" starts wherever "train"
+# does, since it's train+val concatenated).
+_SPLIT_DATE_KEY = {
+    "train": "train",
+    "val": "val",
+    "train_val": "train",
+    "test": "test",
+}
+
+
+def _split_start(dt_range_cfg: dict, split: str) -> pd.Timestamp:
+    """Resolve the real start date of a named split from process_config.yaml.
+
+    Raises:
+        ValueError: If `split` doesn't match a known split name.
+    """
+    key = split.strip().lower()
+    if key not in _SPLIT_DATE_KEY:
+        raise ValueError(
+            f"Unknown split {split!r}. Valid options: {sorted(_SPLIT_DATE_KEY)}"
+        )
+    return pd.to_datetime(dt_range_cfg[_SPLIT_DATE_KEY[key]]["start"], utc=True)
+
 
 def fetch_data(model_type: str, split: str):
     """Fetch the scaled and unscaled data for a given model type and split.
@@ -52,18 +76,25 @@ def fetch_features_targets(model_type: str):
     return cfg["features"], cfg["targets"]
 
 
-def fetch_fitted(model_type: str, model_name: str):
+def fetch_fitted(model_type: str, model_name: str, final: bool = True):
     """Fetch a fitted model for a given model type and model name.
 
     Args:
         model_type (str): The type of model (e.g., "dmf", "hybrid").
         model_name (str): The name of the fitted model file (without the .pkl extension).
+        final (bool): If True (default), fetch the single, already-selected
+            winning model's train_val-refit (final) fit, stored under
+            "full" (the only mode that existed for DMF before candidate/final
+            were distinguished). If False, fetch the train-only-fitted
+            "candidate" model, stored under "candidates", used to compare
+            models via validation performance before a winner is selected.
 
     Returns:
         Any: The fitted model object loaded from the corresponding .pkl file.
     """
     BASE_DIR = Path(__file__).parent.parent.parent.parent
-    MODEL_DIR = BASE_DIR / f"models/{model_type}/full"
+    stage_dir = "full" if final else "candidates"
+    MODEL_DIR = BASE_DIR / f"models/{model_type}/{stage_dir}"
     return load(MODEL_DIR / f"{model_name}.pkl")
 
 
@@ -83,29 +114,21 @@ def fetch_full_scalers(model_type: str):
     return feature_scaler, target_scaler
 
 
-def format_preds(preds, which: str):
-    """Format predictions based on the model type.
-
-    Args:
-        preds (np.ndarray): The raw predictions from the model.
-        which (str): The type of model ("dmf" or "hybrid").
-
-    Returns:
-        np.ndarray: The formatted predictions as a 1D array.
-    """
-    if which == "dmf":
-        return np.asarray(preds).flatten()
-    elif which == "hybrid":
-        return np.asarray(preds).sum(axis=1)
-
-
-def get_predictions_dmf(model_name: str, train_split: str, test_split: str):
+def get_predictions_dmf(
+    model_name: str, train_split: str, test_split: str, final: bool = False
+):
     """Get predictions for a DMF model.
 
     Args:
         model_name (str): The name of the fitted DMF model file (without the .pkl extension).
         train_split (str): The name of the training data split.
         test_split (str): The name of the testing data split.
+        final (bool): If False (default), use the train-only-fitted
+            "candidate" model (see `fetch_fitted`) — pass `train_split="train"`,
+            `test_split="val"` to compare this model's validation performance
+            against other candidates. If True, use the single, already-selected
+            winning model's train_val-refit — pass `train_split="train_val"`,
+            `test_split="test"` for its one-time final evaluation.
 
     Returns:
         Tuple[pd.DataFrame, pd.DataFrame]: A tuple containing the training and testing predictions as DataFrames.
@@ -119,7 +142,7 @@ def get_predictions_dmf(model_name: str, train_split: str, test_split: str):
     X_train_scaled = df_train_scaled[features]
     X_test_scaled = df_test_scaled[features]
 
-    dmf = fetch_fitted(model_type=model_type, model_name=model_name)
+    dmf = fetch_fitted(model_type=model_type, model_name=model_name, final=final)
 
     Y_train_pred = dmf.predict(X_train_scaled)
     Y_test_pred = dmf.predict(X_test_scaled)
@@ -138,12 +161,12 @@ def get_predictions_dmf(model_name: str, train_split: str, test_split: str):
     )
 
     y_train_pred = pd.DataFrame(
-        data=format_preds(preds=Y_train_pred, which="dmf"),
+        data=np.asarray(Y_train_pred).flatten(),
         columns=["price"],
         index=train_val_idx,
     )
     y_test_pred = pd.DataFrame(
-        data=format_preds(preds=Y_test_pred, which="dmf"),
+        data=np.asarray(Y_test_pred).flatten(),
         columns=["price"],
         index=test_idx,
     )
@@ -152,7 +175,11 @@ def get_predictions_dmf(model_name: str, train_split: str, test_split: str):
 
 
 def get_predictions_hybrid(
-    model_name: str, model_class, train_split: str, test_split: str
+    model_name: str,
+    model_class,
+    train_split: str,
+    test_split: str,
+    final: bool = False,
 ):
     """Get predictions for a hybrid model.
 
@@ -161,6 +188,14 @@ def get_predictions_hybrid(
         model_class (_type_): The class of the hybrid model.
         train_split (str): The name of the training data split.
         test_split (str): The name of the testing data split.
+        final (bool): If False (default), use the "candidate" checkpoints
+            under "full" (train/val-fitted, per `get_fitted_ann`) — pass
+            `train_split="train"`, `test_split="val"` to compare this
+            architecture's validation performance against other candidates.
+            If True, use the single, already-selected winning model's
+            train_val-refit checkpoints under "final" — pass
+            `train_split="train_val"`, `test_split="test"` for its one-time
+            final evaluation.
 
     Returns:
         Tuple[np.ndarray, np.ndarray]: A tuple containing the training and testing predictions as NumPy arrays.
@@ -169,7 +204,7 @@ def get_predictions_hybrid(
     BASE_DIR = Path(__file__).parent.parent.parent.parent
     DATA_DIR = BASE_DIR / "data/processed/hybrid"
     CFG_DIR = BASE_DIR / "configs"
-    MODEL_DIR = BASE_DIR / "models/hybrid/full"
+    MODEL_DIR = BASE_DIR / f"models/hybrid/{'final' if final else 'full'}"
 
     with open(CFG_DIR / "data/process_config.yaml") as f:
         dt_range_cfg = safe_load(f)["dt_range"]
@@ -186,29 +221,8 @@ def get_predictions_hybrid(
         datamodule = ANNDataModule(
             data_dir=DATA_DIR, batch_size=batch_size, target_col=target_col
         )
-        datamodule.setup()
-        train_dataloader = (
-            datamodule.train_dataloader()
-            if train_split.lower() == "train"
-            else datamodule.val_dataloader()
-            if train_split.lower() == "val"
-            else datamodule.test_dataloader()
-            if train_split.lower() == "test"
-            else datamodule.train_val_dataloader()
-            if train_split.lower() == "train_val"
-            else None
-        )
-        test_dataloader = (
-            datamodule.train_dataloader()
-            if test_split.lower() == "train"
-            else datamodule.val_dataloader()
-            if test_split.lower() == "val"
-            else datamodule.test_dataloader()
-            if test_split.lower() == "test"
-            else datamodule.train_val_dataloader()
-            if test_split.lower() == "train_val"
-            else None
-        )
+        train_dataloader = datamodule.get_dataloader(train_split)
+        test_dataloader = datamodule.get_dataloader(test_split)
 
         model = model_class.load_from_checkpoint(
             MODEL_DIR / f"{model_name}/{target_col}_{model_name}.ckpt",
@@ -233,12 +247,12 @@ def get_predictions_hybrid(
             torch.cat(y_test_pred, dim=0).detach().cpu().numpy().reshape(-1)  # type: ignore
         )
 
-    train_start = pd.to_datetime(
-        dt_range_cfg["train"]["start"], utc=True
-    ) + pd.Timedelta(seq_len, "h")
-    test_start = pd.to_datetime(dt_range_cfg["test"]["start"], utc=True) + pd.Timedelta(
-        seq_len, "h"
-    )
+    # NOTE: derive each side's start date from the split actually requested,
+    ## not a hardcoded "train"/"test" config key - otherwise a call with
+    ## test_split="val" would silently get its rows stamped with fabricated
+    ## "test" (2024) dates instead of its real (2023) ones.
+    train_start = _split_start(dt_range_cfg, train_split) + pd.Timedelta(seq_len, "h")
+    test_start = _split_start(dt_range_cfg, test_split) + pd.Timedelta(seq_len, "h")
 
     train_val_idx = pd.date_range(
         start=train_start,
@@ -252,15 +266,19 @@ def get_predictions_hybrid(
         freq="h",
     )
 
+    # NOTE: no year-based filtering here - each split's dataset only ever
+    ## contains rows from that split's own date range, so the index computed
+    ## above already reflects exactly the requested data. A hardcoded
+    ## "year < 2024" / "year == 2024" filter only happened to be a no-op for
+    ## the historical train_val/test case; it would silently empty out a
+    ## "val" (2023) split's predictions.
     train_pred_df = pd.DataFrame(train_pred_dict)
     train_pred_df["datetime"] = train_val_idx
     train_pred_df = train_pred_df.set_index("datetime")
-    train_pred_df = train_pred_df[train_pred_df.index.year < 2024]
 
     test_pred_df = pd.DataFrame(test_pred_dict)
     test_pred_df["datetime"] = test_idx
     test_pred_df = test_pred_df.set_index("datetime")
-    test_pred_df = test_pred_df[test_pred_df.index.year == 2024]
 
     _, target_scaler = fetch_full_scalers(model_type="hybrid")
     train_pred_df = pd.DataFrame(
@@ -281,7 +299,11 @@ def get_predictions_hybrid(
 
 
 def get_predictions_ann(
-    model_name: str, model_class, train_split: str, test_split: str
+    model_name: str,
+    model_class,
+    train_split: str,
+    test_split: str,
+    final: bool = False,
 ):
     """Get predictions for an ANN model.
 
@@ -290,6 +312,14 @@ def get_predictions_ann(
         model_class (_type_): The class of the ANN model.
         train_split (str): The name of the training data split.
         test_split (str): The name of the testing data split.
+        final (bool): If False (default), use the "candidate" checkpoint
+            under "full" (train/val-fitted, per `get_fitted_ann`) — pass
+            `train_split="train"`, `test_split="val"` to compare this
+            architecture's validation performance against other candidates.
+            If True, use the single, already-selected winning model's
+            train_val-refit checkpoint under "final" — pass
+            `train_split="train_val"`, `test_split="test"` for its one-time
+            final evaluation.
 
     Returns:
         Tuple[pd.DataFrame, pd.DataFrame]: A tuple containing the training and testing predictions as DataFrames.
@@ -298,7 +328,7 @@ def get_predictions_ann(
     BASE_DIR = Path(__file__).parent.parent.parent.parent
     DATA_DIR = BASE_DIR / "data/processed/ann"
     CFG_DIR = BASE_DIR / "configs"
-    MODEL_DIR = BASE_DIR / "models/ann/full"
+    MODEL_DIR = BASE_DIR / f"models/ann/{'final' if final else 'full'}"
 
     with open(CFG_DIR / "data/process_config.yaml") as f:
         dt_range_cfg = safe_load(f)["dt_range"]
@@ -314,29 +344,8 @@ def get_predictions_ann(
     datamodule = ANNDataModule(
         data_dir=DATA_DIR, batch_size=batch_size, target_col=target_col
     )
-    datamodule.setup()
-    train_dataloader = (
-        datamodule.train_dataloader()
-        if train_split.lower() == "train"
-        else datamodule.val_dataloader()
-        if train_split.lower() == "val"
-        else datamodule.test_dataloader()
-        if train_split.lower() == "test"
-        else datamodule.train_val_dataloader()
-        if train_split.lower() == "train_val"
-        else None
-    )
-    test_dataloader = (
-        datamodule.train_dataloader()
-        if test_split.lower() == "train"
-        else datamodule.val_dataloader()
-        if test_split.lower() == "val"
-        else datamodule.test_dataloader()
-        if test_split.lower() == "test"
-        else datamodule.train_val_dataloader()
-        if test_split.lower() == "train_val"
-        else None
-    )
+    train_dataloader = datamodule.get_dataloader(train_split)
+    test_dataloader = datamodule.get_dataloader(test_split)
 
     model = model_class.load_from_checkpoint(
         MODEL_DIR / f"{model_name}.ckpt",
@@ -361,12 +370,11 @@ def get_predictions_ann(
         torch.cat(y_test_pred, dim=0).detach().cpu().numpy().reshape(-1)  # type: ignore
     )
 
-    train_start = pd.to_datetime(
-        dt_range_cfg["train"]["start"], utc=True
-    ) + pd.Timedelta(seq_len, "h")
-    test_start = pd.to_datetime(dt_range_cfg["test"]["start"], utc=True) + pd.Timedelta(
-        seq_len, "h"
-    )
+    # NOTE: derive each side's start date from the split actually requested,
+    ## not a hardcoded "train"/"test" config key - see get_predictions_hybrid
+    ## for the same fix and rationale.
+    train_start = _split_start(dt_range_cfg, train_split) + pd.Timedelta(seq_len, "h")
+    test_start = _split_start(dt_range_cfg, test_split) + pd.Timedelta(seq_len, "h")
 
     train_idx = pd.date_range(
         start=train_start,
@@ -380,15 +388,14 @@ def get_predictions_ann(
         freq="h",
     )
 
+    # NOTE: no year-based filtering - see get_predictions_hybrid for why.
     train_pred_df = pd.DataFrame(train_pred_dict)
     train_pred_df["datetime"] = train_idx
     train_pred_df = train_pred_df.set_index("datetime")
-    train_pred_df = train_pred_df[train_pred_df.index.year < 2024]
 
     test_pred_df = pd.DataFrame(test_pred_dict)
     test_pred_df["datetime"] = test_idx
     test_pred_df = test_pred_df.set_index("datetime")
-    test_pred_df = test_pred_df[test_pred_df.index.year == 2024]
 
     _, target_scaler = fetch_full_scalers(model_type="ann")
     train_pred_df = pd.DataFrame(

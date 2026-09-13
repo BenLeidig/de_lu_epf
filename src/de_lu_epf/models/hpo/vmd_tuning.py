@@ -3,7 +3,7 @@ import pandas as pd
 from sktime.transformations.series.vmd import VmdTransformer
 
 
-def vmd_fit_transform(K: int, alpha: int, random_state: int, y: np.ndarray):
+def _vmd_fit_transform(K: int, alpha: int, random_state: int, y: np.ndarray):
     """Fit and transform the provided array using VMD with the provided hyperparameters.
 
     Args:
@@ -62,7 +62,7 @@ def vmd_hpo(K: int, alpha: int, random_state: int, y: np.ndarray):
     Returns:
         tuple[dict[int, float], dict[int, float]]: Tuple of (center frequency dictionary, and absolute Pearson correlation coefficient dictionary)
     """
-    imfs = vmd_fit_transform(K=K, alpha=alpha, random_state=random_state, y=y)
+    imfs = _vmd_fit_transform(K=K, alpha=alpha, random_state=random_state, y=y)
     fc_dict = {i: fc(imfs[:, i]) for i in range(imfs.shape[1])}  # type: ignore
     corr_dict = {i: abs_corrcoef(imfs[:, i], y) for i in range(imfs.shape[1])}  # type: ignore
     return fc_dict, corr_dict

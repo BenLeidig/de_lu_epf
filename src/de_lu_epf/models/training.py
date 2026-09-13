@@ -1,12 +1,13 @@
 from pathlib import Path
+from typing import Optional
 
 import lightning.pytorch as pl
 import pandas as pd
+import torch
 from lightgbm import LGBMRegressor
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import ElasticNet, LinearRegression
 from sklearn.svm import SVR
-from torch import lstm
 from xgboost import XGBRegressor
 from yaml import safe_load
 
@@ -15,13 +16,24 @@ from de_lu_epf.models.architectures import DirectMultiStepForecaster
 from de_lu_epf.models.hpo.dmf_tuning import supports_parallel, supports_random_state
 
 ## NOTE: a lot of this code is fairly readable and straightforward.
-## Many code comments are not included hear for brevity and to improve
+## Many code comments are not included here for brevity and to improve
 ## readability. It should be noted, however, that date handling (in
 ## this source code) is set explicity for this research project.
 ## Reach out to ben.leidig@gmail.com if you have any questions.
 
 
-def get_fitted_dmf(model_name: str):
+def get_fitted_dmf(model_name: str, final: bool = True):
+    """Fit a DMF (classical ML) model.
+
+    Args:
+        model_name (str): Which model class to fit (e.g. "en", "svr", "rfr").
+        final (bool): If True (default), fit on the combined `train_val`
+            split. This is the single, already-selected winning model's
+            final refit, done once before its one-time `test` evaluation.
+            If False, fit on `train` only, holding `val` out, producing a
+            "candidate" model whose validation-split performance can be
+            used to compare models before a winner is selected.
+    """
 
     BASE_DIR = Path(__file__).parent.parent.parent.parent
     CFG_DIR = BASE_DIR / "configs/models"
@@ -32,7 +44,8 @@ def get_fitted_dmf(model_name: str):
     features = cfg["features"]
     targets = cfg["targets"]
 
-    df_train_val = pd.read_parquet(DATA_DIR / "train_val_scaled.parquet")
+    split = "train_val" if final else "train"
+    df_train_val = pd.read_parquet(DATA_DIR / f"{split}_scaled.parquet")
     X_train_val = df_train_val[features]
     Y_train_val = df_train_val[targets]
 
@@ -112,6 +125,25 @@ def get_best_ann_params(target_col: str, model_name: str, model_type: str):
     return batch_size, params
 
 
+def get_best_epoch(ckpt_path: Path) -> int:
+    """Read the number of completed training epochs from a Lightning checkpoint.
+
+    Used to carry a candidate model's val-monitored training length over to
+    its final retrain on train+val, where there's no held-out val split left
+    to early-stop against (see `get_fitted_ann(..., final=True)`).
+
+    Args:
+        ckpt_path (Path): Path to a `.ckpt` file written by `get_fitted_ann`
+            with `final=False` (i.e. a candidate model's best checkpoint).
+
+    Returns:
+        int: The number of epochs completed up to and including the
+            checkpointed (best val_loss) epoch.
+    """
+    checkpoint = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+    return checkpoint["epoch"] + 1  # epoch is 0-indexed; +1 gives a count
+
+
 def get_fitted_ann(
     model_class,
     params: dict,
@@ -126,53 +158,99 @@ def get_fitted_ann(
     max_epochs: int = 50,
     accelerator: str = "gpu",
     random_state: int = 0,
+    final: bool = False,
+    num_epochs: Optional[int] = None,
 ):
+    """Fit an ANN/hybrid model.
+
+    Args:
+        final (bool): If False (default), fit on `train`, early-stopping and
+            checkpointing on `val`. Produces a "candidate" model whose
+            validation-split performance can be used to compare
+            architectures before a winner is selected. If True, this is the
+            single, already-selected winning model: it is refit on the
+            combined `train_val` split for exactly `num_epochs` epochs (no
+            held-out val remains to monitor), producing the final model that
+            gets evaluated once on `test`.
+        num_epochs (Optional[int]): Required when `final=True`. The number
+            of epochs to train for, normally read off the winning
+            candidate's best checkpoint via `get_best_epoch()`. Ignored when
+            `final=False`.
+    """
     pl.seed_everything(random_state)
 
-    early_stopping_cb = pl.callbacks.EarlyStopping(  # type: ignore
-        monitor="val_loss", patience=patience, mode="min"
-    )
-
     BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
+    # NOTE: "full" holds candidate (train/val-fitted) ANN/hybrid checkpoints;
+    ## "final" holds the single winning model's train_val-refit checkpoint.
+    ## (For DMF, by contrast, "full" already means "final" - see
+    ## get_fitted_dmf - since it was the only mode that existed before this
+    ## comparison/final split was introduced. Kept as-is to avoid moving any
+    ## existing DMF artifacts.)
+    stage_dir = "final" if final else "full"
     dirpath = (
-        BASE_DIR / f"models/{model_type}/full/{model_name}"
+        BASE_DIR / f"models/{model_type}/{stage_dir}/{model_name}"
         if model_type == "hybrid"
-        else BASE_DIR / f"models/{model_type}/full"
-    )
-    ckpt_cb = pl.callbacks.ModelCheckpoint(  # type: ignore
-        dirpath=dirpath,
-        filename=f"{target_col}_{model_name}",
-        monitor="val_loss",
-        mode="min",
-        save_top_k=1,
-        save_last=False,
+        else BASE_DIR / f"models/{model_type}/{stage_dir}"
     )
 
-    callbacks = [early_stopping_cb, ckpt_cb]
-
-    #### training ####
-    ## making the dataset considering the batch_size
     datamodule = ANNDataModule(
-        data_dir=Path(__file__).resolve().parent.parent.parent.parent
-        / f"data/processed/{model_type}",
+        data_dir=BASE_DIR / f"data/processed/{model_type}",
         batch_size=batch_size,
         target_col=target_col,
         seq_len=seq_len,
         pred_len=pred_len,
         stride=stride,
     )
-    datamodule.setup("fit")
-    input_size = datamodule.input_size
 
-    mod = model_class(input_size=input_size, **params)
+    if final:
+        if num_epochs is None:
+            raise ValueError(
+                "num_epochs is required when final=True: the final retrain on "
+                "train_val has no held-out val split to early-stop against, so "
+                "it must train for a fixed epoch count (typically the winning "
+                "candidate's best-epoch count from get_best_epoch())."
+            )
 
-    trainer = pl.Trainer(  ## instantiating the trainer given the model and callbacks
-        max_epochs=max_epochs,
-        callbacks=callbacks,
-        accelerator=accelerator,
-        logger=False,
-        enable_checkpointing=True,
-        gradient_clip_val=1.0,
-        gradient_clip_algorithm="norm",
-    )
-    trainer.fit(mod, datamodule=datamodule)  ## fitting the trainer
+        datamodule.setup("test")  # loads train_val (+ test, unused here)
+        input_size = datamodule.input_size
+        mod = model_class(input_size=input_size, **params)
+
+        trainer = pl.Trainer(
+            max_epochs=num_epochs,
+            accelerator=accelerator,
+            logger=False,
+            enable_checkpointing=False,
+            gradient_clip_val=1.0,
+            gradient_clip_algorithm="norm",
+        )
+        trainer.fit(mod, train_dataloaders=datamodule.train_val_dataloader())
+
+        dirpath.mkdir(parents=True, exist_ok=True)
+        trainer.save_checkpoint(dirpath / f"{target_col}_{model_name}.ckpt")
+    else:
+        early_stopping_cb = pl.callbacks.EarlyStopping(  # type: ignore
+            monitor="val_loss", patience=patience, mode="min"
+        )
+        ckpt_cb = pl.callbacks.ModelCheckpoint(  # type: ignore
+            dirpath=dirpath,
+            filename=f"{target_col}_{model_name}",
+            monitor="val_loss",
+            mode="min",
+            save_top_k=1,
+            save_last=False,
+        )
+
+        datamodule.setup("fit")
+        input_size = datamodule.input_size
+        mod = model_class(input_size=input_size, **params)
+
+        trainer = pl.Trainer(  ## instantiating the trainer given the model and callbacks
+            max_epochs=max_epochs,
+            callbacks=[early_stopping_cb, ckpt_cb],
+            accelerator=accelerator,
+            logger=False,
+            enable_checkpointing=True,
+            gradient_clip_val=1.0,
+            gradient_clip_algorithm="norm",
+        )
+        trainer.fit(mod, datamodule=datamodule)  ## fitting the trainer

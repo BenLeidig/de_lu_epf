@@ -7,11 +7,20 @@ if __name__ == "__main__":
     DATA_DIR = BASE_DIR / "data/predictions"
 
     model_name = "lr"
-    y_train_val_pred, y_test_pred = get_predictions_dmf(model_name)
-
-    y_train_val_pred.to_parquet(
-        DATA_DIR / f"train_val/dmf/{model_name}_train_val_pred.parquet", index=True
+    # Comparison-mode predictions: this "candidate" model was fit on
+    # train, held out from val, so its val-split predictions can be
+    # compared against other candidates' by validation performance.
+    # Only the single overall winner gets a train_val refit and a
+    # one-time test evaluation - see select_final_model.py.
+    y_train_pred, y_val_pred = get_predictions_dmf(
+        model_name=model_name,
+        train_split="train",
+        test_split="val",
     )
-    y_test_pred.to_parquet(
-        DATA_DIR / f"test/dmf/{model_name}_test_pred.parquet", index=True
+
+    y_train_pred.to_parquet(
+        DATA_DIR / f"train/dmf/{model_name}_train_pred.parquet", index=True
+    )
+    y_val_pred.to_parquet(
+        DATA_DIR / f"val/dmf/{model_name}_val_pred.parquet", index=True
     )

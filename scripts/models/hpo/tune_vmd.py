@@ -21,7 +21,14 @@ if __name__ == "__main__":
     # Set paths
     BASE_DIR = Path(__file__).resolve().parent.parent.parent
     cfg_path = BASE_DIR / "configs/models/hpo_config.yaml"
-    data_path = BASE_DIR / "data/processed/processed.parquet"
+    # NOTE: use the already-split train_val file (2019-2023), NOT the full,
+    ## unsplit processed.parquet (2019-2024) - that included the 2024 test
+    ## year, which leaked test data into the VMD mode-count (K) selection
+    ## diagnostics computed below. train_val.parquet's "price" column is
+    ## identical across model types (it's the shared, undecomposed target
+    ## series), so any one of them works; "ann" is used here for no
+    ## particular reason.
+    data_path = BASE_DIR / "data/processed/ann/train_val.parquet"
     output_path = BASE_DIR / "reports/figures/vmd_hpo"
 
     # Set configs

@@ -10,7 +10,7 @@ from sklearn.metrics import mean_absolute_error
 from sklearn.model_selection import TimeSeriesSplit
 
 
-def create_dmf_data(set: str, features: list, target: str):
+def _create_dmf_data(set: str, features: list, target: str):
     BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent.parent
     data_path = BASE_DIR / "data/processed/dmf_data"
     df = pd.read_parquet(data_path / f"{set}_scaled.parquet")
@@ -19,15 +19,15 @@ def create_dmf_data(set: str, features: list, target: str):
     return X, y
 
 
-def supports_random_state(model_class):
+def _supports_random_state(model_class):
     return "random_state" in signature(model_class).parameters
 
 
-def supports_parallel(model_class):
+def _supports_parallel(model_class):
     return "n_jobs" in signature(model_class).parameters
 
 
-def suggest_from_config(trial: optuna.trial.Trial, config: dict):
+def _suggest_from_config(trial: optuna.trial.Trial, config: dict):
     """Obtain the suggested parameters for an Optuna trial given the provided configurations.
     An example configuration is:
     search_space = {
@@ -63,7 +63,7 @@ def suggest_from_config(trial: optuna.trial.Trial, config: dict):
     return params
 
 
-def create_dmf_objective(hour: int, model_class, search_space: dict, n_jobs: int):
+def _create_dmf_objective(hour: int, model_class, search_space: dict, n_jobs: int):
     """Create the objective function for the provided model class forecasting the provided hour that searches the provided parameter space.
     An example configuration is:
     search_space = {
@@ -90,17 +90,17 @@ def create_dmf_objective(hour: int, model_class, search_space: dict, n_jobs: int
     features = cfg["features"]
     target = cfg["targets"][hour]
 
-    X_train, y_train = create_dmf_data("train", features, target)
-    X_val, y_val = create_dmf_data("val", features, target)
+    X_train, y_train = _create_dmf_data("train", features, target)
+    X_val, y_val = _create_dmf_data("val", features, target)
     X_train_val = pd.concat([X_train, X_val], axis=0)
     y_train_val = pd.concat([y_train, y_val], axis=0)
     tscv = TimeSeriesSplit(n_splits=5, max_train_size=365 * 4, test_size=365 // 5)
 
     def objective(trial: optuna.trial.Trial):
-        params = suggest_from_config(trial, search_space)
-        if supports_random_state(model_class):
+        params = _suggest_from_config(trial, search_space)
+        if _supports_random_state(model_class):
             params["random_state"] = 0
-        if supports_parallel(model_class):
+        if _supports_parallel(model_class):
             params["n_jobs"] = n_jobs
 
         val_scores = np.zeros(5)
@@ -158,7 +158,7 @@ def create_dmf_study(
         optuna.study.Study: Optuna study after completed optimization.
     """
     n_trials = 50 * len(search_space.keys()) if n_trials == "auto" else n_trials
-    objective = create_dmf_objective(hour, model_class, search_space, n_jobs)
+    objective = _create_dmf_objective(hour, model_class, search_space, n_jobs)
     sampler = optuna.samplers.TPESampler(multivariate=multivariate, seed=random_state)
     study = optuna.create_study(direction="minimize", sampler=sampler)
     study.optimize(objective, n_trials=n_trials)  # type: ignore

@@ -71,6 +71,14 @@ class ANNDataModule(pl.LightningDataModule):
         stride (int): Amount to skip for each prediction. (Should equal pred_len for this research.)
     """
 
+    # Single source of truth for valid split names and the parquet file each one maps to.
+    _SPLIT_FILES = {
+        "train": "train_scaled.parquet",
+        "val": "val_scaled.parquet",
+        "train_val": "train_val_scaled.parquet",
+        "test": "test_scaled.parquet",
+    }
+
     def __init__(
         self,
         data_dir: Path,
@@ -87,89 +95,94 @@ class ANNDataModule(pl.LightningDataModule):
         self.seq_len = seq_len
         self.pred_len = pred_len
         self.stride = stride
+        self._datasets: dict[str, ANNDataset] = {}  # per-split lazy-load cache
 
     def setup(self, stage=None):
-        # NOTE: MUST ALWAYS exist train_scaled.parquet in data_dir path.
-        ## Logic: this is to read the index of the the target_col to
-        ## avoid unnecessary recomputations.
-        df_train = pd.read_parquet(self.data_dir / "train_scaled.parquet")
-        self.target_idx = df_train.columns.get_loc(self.target_col)
-        self.input_size = df_train.shape[1]
+        # Must call ANNDataModule.setup() before calling train_dataloader() /
+        # val_dataloader() / test_dataloader() / train_val_dataloader().
+        # Delegates to the same lazy, cached per-split loader that
+        # get_dataloader() uses, so a split read here (e.g. via stage="fit")
+        # isn't re-read if get_dataloader() is later called for that split.
+        self._ensure_schema()
 
-        # Must call ANNDataModule.setup() before calling dataloaders.
         if stage in (
             None,
             "fit",
         ):  ## fit stage constructs train and validation datasets.
-            ## Training dataset:
-            np_train = df_train.to_numpy()
-            self.X_train = np_train
-            self.y_train = np_train[:, self.target_idx]
-            self.train_dataset = ANNDataset(
-                self.X_train, self.y_train, self.seq_len, self.pred_len, self.stride
-            )
-
-            ## Validation dataset:
-            np_val = pd.read_parquet(self.data_dir / "val_scaled.parquet").to_numpy()
-            self.X_val = np_val
-            self.y_val = np_val[:, self.target_idx]
-            self.val_dataset = ANNDataset(
-                self.X_val, self.y_val, self.seq_len, self.pred_len, self.stride
-            )
+            self.train_dataset = self._load_dataset("train")
+            self.val_dataset = self._load_dataset("val")
 
         if stage in (None, "test"):
-            ## Training + validation dataset:
-            np_train_val = pd.read_parquet(
-                self.data_dir / "train_val_scaled.parquet"
-            ).to_numpy()
-            self.X_train_val = np_train_val
-            self.y_train_val = np_train_val[:, self.target_idx]
-            self.train_val_dataset = ANNDataset(
-                self.X_train_val,
-                self.y_train_val,
-                self.seq_len,
-                self.pred_len,
-                self.stride,
-            )
-
-            ## Testing dataset:
-            np_test = pd.read_parquet(self.data_dir / "test_scaled.parquet").to_numpy()
-            self.X_test = np_test
-            self.y_test = np_test[:, self.target_idx]
-            self.test_dataset = ANNDataset(
-                self.X_test, self.y_test, self.seq_len, self.pred_len, self.stride
-            )
+            self.train_val_dataset = self._load_dataset("train_val")
+            self.test_dataset = self._load_dataset("test")
 
     def train_dataloader(self):
-        return DataLoader(
-            self.train_dataset,
-            batch_size=self.batch_size,
-            shuffle=False,  # Real-time constraint
-            num_workers=2,
-            persistent_workers=False,  # False for HPC cluster
-        )
+        return self.get_dataloader("train")
 
     def val_dataloader(self):
-        return DataLoader(
-            self.val_dataset,
-            batch_size=self.batch_size,
-            shuffle=False,  # Real-time constraint
-            num_workers=2,
-            persistent_workers=False,  # False for HPC cluster
-        )
+        return self.get_dataloader("val")
 
     def train_val_dataloader(self):
-        return DataLoader(
-            self.train_val_dataset,
-            batch_size=self.batch_size,
-            shuffle=False,  # Real-time constraint
-            num_workers=2,
-            persistent_workers=False,  # False for HPC cluster
-        )
+        return self.get_dataloader("train_val")
 
     def test_dataloader(self):
+        return self.get_dataloader("test")
+
+    def _ensure_schema(self) -> None:
+        # Reads train_scaled.parquet once to derive target_idx / input_size,
+        # independent of setup() and however get_dataloader() is called.
+        if getattr(self, "target_idx", None) is None:
+            df_train = pd.read_parquet(self.data_dir / self._SPLIT_FILES["train"])
+            self.target_idx = df_train.columns.get_loc(self.target_col)
+            self.input_size = df_train.shape[1]
+
+    def _load_dataset(self, split: str) -> ANNDataset:
+        """Lazily load (and cache) the ANNDataset for a single named split.
+
+        Args:
+            split (str): One of "train", "val", "train_val", "test" (case- and
+                whitespace-insensitive).
+
+        Raises:
+            ValueError: If ``split`` doesn't match one of the known splits.
+        """
+        key = split.strip().lower()
+        if key not in self._SPLIT_FILES:
+            raise ValueError(
+                f"Unknown split {split!r}. Valid options: {sorted(self._SPLIT_FILES)}"
+            )
+
+        if key not in self._datasets:
+            self._ensure_schema()
+            np_arr = pd.read_parquet(self.data_dir / self._SPLIT_FILES[key]).to_numpy()
+            X = np_arr
+            y = np_arr[:, self.target_idx]
+            self._datasets[key] = ANNDataset(
+                X, y, self.seq_len, self.pred_len, self.stride
+            )
+
+        return self._datasets[key]
+
+    def get_dataloader(self, split: str) -> DataLoader:
+        """Get a DataLoader for a single named split, loading only that split.
+
+        Unlike ``setup(stage=None)`` (which eagerly reads all four splits),
+        this loads at most the one parquet file requested, and caches it per
+        instance so repeated calls (e.g. the same split used for both a
+        "train" and "test" context) don't re-read the file. Intended for
+        callers that need to pick an arbitrary split by name at runtime, such
+        as generating predictions over a caller-chosen train/test split.
+
+        Args:
+            split (str): One of "train", "val", "train_val", "test" (case- and
+                whitespace-insensitive).
+
+        Raises:
+            ValueError: If ``split`` doesn't match one of the known splits.
+        """
+        dataset = self._load_dataset(split)
         return DataLoader(
-            self.test_dataset,
+            dataset,
             batch_size=self.batch_size,
             shuffle=False,  # Real-time constraint
             num_workers=2,

@@ -30,7 +30,13 @@ if __name__ == "__main__":
     torch.multiprocessing.set_start_method("spawn", force=True)
 
     # Create study
-    study = tuner(target_col=target_col, model_type=model_type, **cfg)
+    checkpoint_path = studies_path / f"{target_col}_{model_name}_best.ckpt"
+    study = tuner(
+        target_col=target_col,
+        model_type=model_type,
+        checkpoint_path=checkpoint_path,
+        **cfg,
+    )
 
     # Save study
     dump(study, studies_path / f"{target_col}_{model_name}.pkl")
