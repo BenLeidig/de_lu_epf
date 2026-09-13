@@ -21,7 +21,7 @@ tcn-lstm-mha:
   patience: 5
   max_epochs: 50
   reduction_factor: 3
-  n_trials: 1000
+  n_trials: 500
   accelerator: gpu
   random_state: 0
 
@@ -37,7 +37,7 @@ tcn-lstm:
   patience: 5
   max_epochs: 50
   reduction_factor: 3
-  n_trials: 1000
+  n_trials: 500
   accelerator: gpu
   random_state: 0
 
@@ -54,7 +54,7 @@ tcn-mha:
   patience: 5
   max_epochs: 50
   reduction_factor: 3
-  n_trials: 1000
+  n_trials: 500
   accelerator: gpu
   random_state: 0
 
@@ -70,7 +70,7 @@ lstm-mha:
   patience: 5
   max_epochs: 50
   reduction_factor: 3
-  n_trials: 1000
+  n_trials: 500
   accelerator: gpu
   random_state: 0
 
@@ -85,7 +85,7 @@ tcn:
   patience: 5
   max_epochs: 50
   reduction_factor: 3
-  n_trials: 1000
+  n_trials: 500
   accelerator: gpu
   random_state: 0
 
@@ -99,7 +99,7 @@ lstm:
   patience: 5
   max_epochs: 50
   reduction_factor: 3
-  n_trials: 1000
+  n_trials: 500
   accelerator: gpu
   random_state: 0
 

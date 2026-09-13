@@ -19,7 +19,7 @@ if __name__ == "__main__":
     print("+" * 8, " `tune_vmd.py` started. ", "+" * 8)
 
     # Set paths
-    BASE_DIR = Path(__file__).resolve().parent.parent.parent
+    BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
     cfg_path = BASE_DIR / "configs/models/hpo_config.yaml"
     # NOTE: use the already-split train_val file (2019-2023), NOT the full,
     ## unsplit processed.parquet (2019-2024) - that included the 2024 test

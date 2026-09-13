@@ -10,6 +10,15 @@ from torch.utils.data import DataLoader
 ArrayLike = Union[np.ndarray, torch.Tensor]
 
 
+def _create_dmf_data(set: str, features: list, target: str):
+    BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
+    data_path = BASE_DIR / "data/processed/dmf"
+    df = pd.read_parquet(data_path / f"{set}_scaled.parquet")
+    X = df[features]
+    y = df[target]
+    return X, y
+
+
 class ANNDataset(torch.utils.data.Dataset):
     """Custom PyTorch Dataset class for ANN models in this repository. Intended for seq-to-seq forecasting using sliding windows.
 

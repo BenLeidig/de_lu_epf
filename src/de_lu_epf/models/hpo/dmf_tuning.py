@@ -9,14 +9,7 @@ import yaml
 from sklearn.metrics import mean_absolute_error
 from sklearn.model_selection import TimeSeriesSplit
 
-
-def _create_dmf_data(set: str, features: list, target: str):
-    BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent.parent
-    data_path = BASE_DIR / "data/processed/dmf_data"
-    df = pd.read_parquet(data_path / f"{set}_scaled.parquet")
-    X = df[features]
-    y = df[target]
-    return X, y
+from src.de_lu_epf.data.loading import _create_dmf_data
 
 
 def _supports_random_state(model_class):
