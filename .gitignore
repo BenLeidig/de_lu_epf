@@ -4,3 +4,4 @@ logs/slurm/*
 *.pyc
 __pycache__/
 README.html
+.claude

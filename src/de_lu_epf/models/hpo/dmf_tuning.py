@@ -2,12 +2,12 @@ import gc
 from inspect import signature
 from pathlib import Path
 
-import numpy as np
+# import numpy as np
 import optuna
-import pandas as pd
+# import pandas as pd
 import yaml
 from sklearn.metrics import mean_absolute_error
-from sklearn.model_selection import TimeSeriesSplit
+# from sklearn.model_selection import TimeSeriesSplit
 
 from src.de_lu_epf.data.loading import _create_dmf_data
 
@@ -85,9 +85,7 @@ def _create_dmf_objective(hour: int, model_class, search_space: dict, n_jobs: in
 
     X_train, y_train = _create_dmf_data("train", features, target)
     X_val, y_val = _create_dmf_data("val", features, target)
-    X_train_val = pd.concat([X_train, X_val], axis=0)
-    y_train_val = pd.concat([y_train, y_val], axis=0)
-    tscv = TimeSeriesSplit(n_splits=5, max_train_size=365 * 4, test_size=365 // 5)
+    # tscv = TimeSeriesSplit(n_splits=5, max_train_size=365 * 4, test_size=365 // 5)
 
     def objective(trial: optuna.trial.Trial):
         params = _suggest_from_config(trial, search_space)
@@ -96,27 +94,15 @@ def _create_dmf_objective(hour: int, model_class, search_space: dict, n_jobs: in
         if _supports_parallel(model_class):
             params["n_jobs"] = n_jobs
 
-        val_scores = np.zeros(5)
-        for i, (train_idx, val_idx) in enumerate(
-            tscv.split(X=X_train_val, y=y_train_val)  # type: ignore
-        ):
-            X_train_cv, y_train_cv = (
-                X_train_val.iloc[train_idx, :],
-                y_train_val.iloc[train_idx],
-            )
-            X_val_cv, y_val_cv = X_train_val.iloc[val_idx, :], y_train_val.iloc[val_idx]
+        mod = model_class(**params)
+        mod.fit(X_train, y_train)
+        y_val_pred = mod.predict(X_val)
 
-            mod = model_class(**params)
-            mod.fit(X_train_cv, y_train_cv)
-            y_val_cv_pred = mod.predict(X_val_cv)
-
-            score = mean_absolute_error(y_val_cv, y_val_cv_pred)
-            val_scores[i] = score
-        mean_val_score = np.mean(val_scores)
+        val_score = mean_absolute_error(y_true=y_val, y_pred=y_val_pred)
 
         gc.collect()
 
-        return mean_val_score
+        return val_score
 
     return objective
 

@@ -11,10 +11,14 @@ src/de_lu_epf/data/loading.py
 src/de_lu_epf/data/processing.py
 src/de_lu_epf/models/__init__.py
 src/de_lu_epf/models/architectures.py
-src/de_lu_epf/models/final_fitting.py
 src/de_lu_epf/models/predicting.py
 src/de_lu_epf/models/training.py
 src/de_lu_epf/models/hpo/__init__.py
+src/de_lu_epf/models/hpo/ann_tuning.py
+src/de_lu_epf/models/hpo/baseline_tuning.py
 src/de_lu_epf/models/hpo/dmf_tuning.py
-src/de_lu_epf/models/hpo/hybrid_tuning.py
 src/de_lu_epf/models/hpo/vmd_tuning.py
+src/de_lu_epf/plots/__init__.py
+src/de_lu_epf/plots/predictions.py
+src/de_lu_epf/plots/utils.py
+src/de_lu_epf/plots/vmd.py

@@ -34,7 +34,7 @@ if __name__ == "__main__":
                 X_train = df_train.loc[:, dmf_features]
                 y_train = df_train[dmf_responses]
                 X_test = df_test.loc[:, dmf_features]
-                y_test = df_test[dmf_responses]
+                y_test = df_test[dmf_responses]o
 
                 ### Scaled features
                 scaler, _, X_train_scaled, X_test_scaled = get_scaled(

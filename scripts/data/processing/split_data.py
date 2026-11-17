@@ -19,7 +19,7 @@ if __name__ == "__main__":
 
     # Load data
     df = pd.read_parquet(data_path / "processed/processed.parquet")
-    df_dmf = pd.read_parquet(data_path / "processed/dmf_data/processed.parquet")
+    df_dmf = pd.read_parquet(data_path / "processed/dmf/processed.parquet")
 
     # Get split list (list of dates for each split)
     split_names = ["train", "val", "test"]
@@ -28,11 +28,11 @@ if __name__ == "__main__":
         split_list.append((cfg[k]["start"], cfg[k]["end"]))
 
     #### #### ANN-specific data splits #### ####
-    save_splits(df, split_list, path=data_path / "processed/ann_data")
+    save_splits(df, split_list, path=data_path / "processed/ann")
     print("-" * 8, "Saved ANN splits.", "-" * 8)
 
     #### #### DMF-specific data splits #### ####
-    save_splits(df_dmf, split_list, path=data_path / "processed/dmf_data")
+    save_splits(df_dmf, split_list, path=data_path / "processed/dmf")
     print("-" * 8, "Saved DMF splits.", "-" * 8)
 
     print("+" * 8, " `split_data.py` completed. ", "+" * 8)

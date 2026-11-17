@@ -10,6 +10,26 @@ from sklearn.utils.validation import check_is_fitted, validate_data  # type: ign
 torch.set_float32_matmul_precision("high")
 
 
+def naive_forecast(y_true: pd.DataFrame):
+    """Get naive forecasts for each hour (column) of each day (row) in `y_true`.
+    Naive forecasts for Tues-Fri are the historical values from the previous day and,
+    for Sat-Mon, are the historical values from the same day of the previous week.
+
+    Args:
+        y_true (pd.DataFrame): (nxm) DataFrame matrix containing the true values with a datetime index
+            (i.e., each column represents a different hour of the day, such that m=24).
+
+    Returns:
+        pd.DataFrame: (nxm) DataFrame matrix containing the naive forecasts for each hour of the next
+            day based on the last 24 hours of the current day and same day of the previous week, for
+            every day in the series.
+    """
+    lag1 = y_true.shift(1, freq="D").reindex(y_true.index)
+    lag7 = y_true.shift(7, freq="D").reindex(y_true.index)
+    tue_thru_fri = y_true.index.dayofweek.isin([1, 2, 3, 4])  # type: ignore
+    return lag1.where(tue_thru_fri[:, None], lag7)
+
+
 class DirectMultiStepForecaster(RegressorMixin, BaseEstimator):
     """Custom Direct Multi-Step Forecaster (DMF) wrapper class. Creates 24 models of the provided `model_class` class, each to forecast a specific hour of the next day.
     Args:

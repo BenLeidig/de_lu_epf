@@ -55,7 +55,6 @@ if __name__ == "__main__":
     data_path = BASE_DIR / "data/processed"
 
     df = pd.read_parquet(data_path / "processed.parquet")
-    df = df[df.index.hour == 0]  # type: ignore
 
     # NOTE: Naming convention:
     ## `**_{variable}` signifies the `**`th hour of the current day.
@@ -91,8 +90,10 @@ if __name__ == "__main__":
     # Convert constructor dictionary to DataFrame
     df_dmf = pd.DataFrame.from_dict(dict_dmf, orient="columns")
     df_dmf = df_dmf.set_index("datetime")
+    df_dmf = df_dmf[df_dmf.index.hour == 0]  # type: ignore
+    ## FIXED - A2
 
     # Save DataFrame
-    df_dmf.to_parquet(data_path / "dmf_data/processed.parquet", index=True)
+    df_dmf.to_parquet(data_path / "dmf/processed.parquet", index=True)
 
     print("+" * 8, " `dmf_features.py` completed. ", "+" * 8)

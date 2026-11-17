@@ -6,6 +6,8 @@ import yaml
 from joblib import dump
 from sktime.transformations.series.vmd import VmdTransformer
 
+def causal_transform(model, )
+
 if __name__ == "__main__":
     print("+" * 8, " `vmd_features.py` started. ", "+" * 8)
 
